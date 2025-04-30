@@ -1,0 +1,38 @@
+package com.example.demo.entity;
+import java.time.LocalDateTime;
+
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Getter
+@Builder
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Table(name = "dexcom")
+public class Dexcom {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "dexcom_id", nullable = false)
+	private Long dexcomId;
+
+	@Column(name = "user_id", nullable = false)
+	private Long userId;
+
+	@Column(name = "is_connected", length = 20)
+	private String isConnected;
+
+	@Column(name = "max_glucose", nullable = false)
+	private Integer maxGlucose;
+
+	@Column(name = "min_glucose")
+	private Integer minGlucose;
+
+	@Column(name = "last_egv_time")
+	private LocalDateTime lastEgvTime;
+}

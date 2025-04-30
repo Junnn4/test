@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Dexcom OAuth2 테스트 페이지</title>
+    <style>
+        body { font-family: sans-serif; padding: 2rem; }
+        button { margin: .5rem 0; padding: .5rem 1rem; font-size: 1rem; }
+        pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+<h1>Dexcom OAuth2 테스트</h1>
+
+<!-- 1) 로그인 버튼 -->
+<button id="btn-login">Dexcom 로그인</button>
+
+<!-- 2) Callback로 받은 코드 표시 -->
+<h2>OAuth Callback</h2>
+<pre id="callbackOutput">(여기에 URL 파라미터가 표시됩니다)</pre>
+
+<!-- 3) 저장된 토큰 조회 -->
+<h2>저장된 토큰 조회</h2>
+<button id="btn-tokens">토큰 보기</button>
+<pre id="tokensOutput">(토큰 JSON)</pre>
+
+<!-- 4) EGVS(혈당 데이터) 조회 -->
+<h2>혈당 데이터 조회</h2>
+<button id="btn-egvs">EGVS 가져오기</button>
+<pre id="egvsOutput">(혈당 데이터)</pre>
+
+<!-- 5) Refresh 토큰으로 Access Token 갱신 -->
+<h2>Refresh 토큰으로 Access Token 갱신</h2>
+<button id="btn-refresh">Access Token 갱신하기</button>
+<pre id="refreshOutput">(갱신 결과)</pre>
+
+<script>
+    // 1) 로그인 버튼 → /glucose/auth 리디렉트
+    document.getElementById('btn-login').addEventListener('click', () => {
+        window.location.href = '/glucose/auth';
+    });
+
+    // 2) 페이지 로드 시, URL에 code 또는 error 파라미터가 있으면 표시
+    window.addEventListener('load', () => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.toString()) {
+            document.getElementById('callbackOutput').textContent = params.toString();
+        }
+    });
+
+    // 3) 저장된 토큰 조회
+    document.getElementById('btn-tokens').addEventListener('click', async () => {
+        const res = await fetch('/glucose/tokens');
+        const data = await res.json();
+        document.getElementById('tokensOutput').textContent = JSON.stringify(data, null, 2);
+    });
+
+    // 4) EGVS 호출
+    document.getElementById('btn-egvs').addEventListener('click', async () => {
+        const res = await fetch('/glucose/1/egvs');
+        const text = await res.text();
+        document.getElementById('egvsOutput').textContent = text;
+    });
+
+    // 5) Refresh 토큰으로 Access Token 갱신
+    document.getElementById('btn-refresh').addEventListener('click', async () => {
+        const res = await fetch('/glucose/refresh', { method: 'POST' });
+        const text = await res.text();
+        document.getElementById('refreshOutput').textContent = text;
+    });
+</script>
+</body>
+</html>
