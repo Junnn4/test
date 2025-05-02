@@ -2,45 +2,100 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Dexcom OAuth2 테스트 페이지</title>
+    <title>Dexcom 통합 테스트 페이지</title>
     <style>
         body { font-family: sans-serif; padding: 2rem; }
+        section { margin-bottom: 2rem; }
         button { margin: .5rem 0; padding: .5rem 1rem; font-size: 1rem; }
+        input { padding: .3rem; margin-right: .5rem; }
         pre { background: #f4f4f4; padding: 1rem; white-space: pre-wrap; word-wrap: break-word; }
+        label { display: block; margin: .3rem 0; }
     </style>
 </head>
 <body>
-<h1>Dexcom OAuth2 테스트</h1>
+<h1>Dexcom 통합 테스트 페이지</h1>
 
 <!-- 1) 로그인 버튼 -->
-<button id="btn-login">Dexcom 로그인</button>
+<section>
+    <h2>1. Dexcom OAuth 로그인</h2>
+    <button id="btn-login">Dexcom 로그인</button>
+</section>
 
-<!-- 2) Callback로 받은 코드 표시 -->
-<h2>OAuth Callback</h2>
-<pre id="callbackOutput">(여기에 URL 파라미터가 표시됩니다)</pre>
+<!-- 2) OAuth 콜백 파라미터 표시 -->
+<section>
+    <h2>2. OAuth Callback</h2>
+    <pre id="callbackOutput">(여기에 code / state / error 파라미터가 표시됩니다)</pre>
+</section>
 
-<!-- 3) 저장된 토큰 조회 -->
-<h2>저장된 토큰 조회</h2>
-<button id="btn-tokens">토큰 보기</button>
-<pre id="tokensOutput">(토큰 JSON)</pre>
+<!-- 3) 기기 정보 가져오기 -->
+<section>
+    <h2>3. 기기 정보 조회</h2>
+    <button id="btn-device">기기 정보 가져오기</button>
+    <pre id="deviceOutput">(isConnected, max/min, lastEgvTime 등)</pre>
+</section>
 
-<!-- 4) EGVS(혈당 데이터) 조회 -->
-<h2>혈당 데이터 조회</h2>
-<button id="btn-egvs">EGVS 가져오기</button>
-<pre id="egvsOutput">(혈당 데이터)</pre>
+<!-- 4) 내 설정 조회 -->
+<section>
+    <h2>4. 내 Dexcom 설정 조회</h2>
+    <button id="btn-settings">설정 조회</button>
+    <pre id="settingsOutput">(maxGlucose, minGlucose, lastEgvTime 등)</pre>
+</section>
 
-<!-- 5) Refresh 토큰으로 Access Token 갱신 -->
-<h2>Refresh 토큰으로 Access Token 갱신</h2>
-<button id="btn-refresh">Access Token 갱신하기</button>
-<pre id="refreshOutput">(갱신 결과)</pre>
+<!-- 5) Access Token 갱신 -->
+<section>
+    <h2>5. Access Token 갱신</h2>
+    <button id="btn-refresh">Access Token 갱신하기</button>
+    <pre id="refreshOutput">(갱신 결과 메시지)</pre>
+</section>
+
+<!-- 6) EGVS 저장 (스케줄 대신 수동 호출) -->
+<section>
+    <h2>6. EGVS 저장</h2>
+    <label>
+        Dexcom ID:
+        <input id="inputSaveDexcomId" type="number" value="1" />
+    </label>
+    <button id="btn-save-egvs">EGVS 저장하기</button>
+    <pre id="saveEgvsOutput">(저장 결과 메시지)</pre>
+</section>
+
+<!-- 7) 특정 기간 EGVS 조회 -->
+<section>
+    <h2>7. 특정 기간 EGVS 조회</h2>
+    <label>
+        Dexcom ID:
+        <input id="inputMyDexcomId" type="number" value="1" />
+    </label>
+    <label>
+        Start Date (ISO):
+        <input id="inputStart" placeholder="2025-05-01T00:00:00" />
+    </label>
+    <label>
+        End Date (ISO):
+        <input id="inputEnd" placeholder="2025-05-01T01:00:00" />
+    </label>
+    <button id="btn-my-egvs">EGVS 조회</button>
+    <pre id="myEgvsOutput">(혈당 데이터 리스트)</pre>
+</section>
+
+<!-- 8) 전체 EGVS 조회 -->
+<section>
+    <h2>8. 전체 EGVS 조회</h2>
+    <label>
+        Dexcom ID:
+        <input id="inputAllDexcomId" type="number" value="1" />
+    </label>
+    <button id="btn-all-egvs">전체 EGVS 조회</button>
+    <pre id="allEgvsOutput">(전체 혈당 데이터)</pre>
+</section>
 
 <script>
-    // 1) 로그인 버튼 → /glucose/auth 리디렉트
+    // 1) 로그인 → OAuth 인증 페이지로 리디렉트
     document.getElementById('btn-login').addEventListener('click', () => {
-        window.location.href = '/glucose/auth';
+        window.location.href = '/api/v1/glucose/auth';
     });
 
-    // 2) 페이지 로드 시, URL에 code 또는 error 파라미터가 있으면 표시
+    // 2) 콜백 파라미터 표시
     window.addEventListener('load', () => {
         const params = new URLSearchParams(window.location.search);
         if (params.toString()) {
@@ -48,25 +103,52 @@
         }
     });
 
-    // 3) 저장된 토큰 조회
-    document.getElementById('btn-tokens').addEventListener('click', async () => {
-        const res = await fetch('/glucose/tokens');
-        const data = await res.json();
-        document.getElementById('tokensOutput').textContent = JSON.stringify(data, null, 2);
-    });
-
-    // 4) EGVS 호출
-    document.getElementById('btn-egvs').addEventListener('click', async () => {
-        const res = await fetch('/glucose/1/egvs');
+    // 3) 기기 정보 조회
+    document.getElementById('btn-device').addEventListener('click', async () => {
+        const res = await fetch('/api/v1/glucose/device');
         const text = await res.text();
-        document.getElementById('egvsOutput').textContent = text;
+        document.getElementById('deviceOutput').textContent = text;
     });
 
-    // 5) Refresh 토큰으로 Access Token 갱신
+    // 4) 내 설정 조회
+    document.getElementById('btn-settings').addEventListener('click', async () => {
+        const res = await fetch('/api/v1/glucose/my/setting');
+        const data = await res.json();
+        document.getElementById('settingsOutput').textContent = JSON.stringify(data, null, 2);
+    });
+
+    // 5) Access Token 갱신
     document.getElementById('btn-refresh').addEventListener('click', async () => {
-        const res = await fetch('/glucose/refresh', { method: 'POST' });
+        const res = await fetch('/api/v1/glucose/refresh', { method: 'POST' });
         const text = await res.text();
         document.getElementById('refreshOutput').textContent = text;
+    });
+
+    // 6) EGVS 저장
+    document.getElementById('btn-save-egvs').addEventListener('click', async () => {
+        const dexcomId = document.getElementById('inputSaveDexcomId').value;
+        const res = await fetch(`/api/v1/glucose/${dexcomId}/egvs`);
+        const text = await res.text();
+        document.getElementById('saveEgvsOutput').textContent = text;
+    });
+
+    // 7) 특정 기간 EGVS 조회
+    document.getElementById('btn-my-egvs').addEventListener('click', async () => {
+        const dexcomId = document.getElementById('inputMyDexcomId').value;
+        const start = encodeURIComponent(document.getElementById('inputStart').value);
+        const end   = encodeURIComponent(document.getElementById('inputEnd').value);
+        const url   = `/api/v1/glucose/my/${dexcomId}/egvs?startDate=${start}&endDate=${end}`;
+        const res   = await fetch(url);
+        const data  = await res.json();
+        document.getElementById('myEgvsOutput').textContent = JSON.stringify(data, null, 2);
+    });
+
+    // 8) 전체 EGVS 조회
+    document.getElementById('btn-all-egvs').addEventListener('click', async () => {
+        const dexcomId = document.getElementById('inputAllDexcomId').value;
+        const res = await fetch(`/api/v1/glucose/my/all/${dexcomId}/egvs`);
+        const data = await res.json();
+        document.getElementById('allEgvsOutput').textContent = JSON.stringify(data, null, 2);
     });
 </script>
 </body>

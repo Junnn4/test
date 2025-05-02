@@ -29,6 +29,6 @@ spring:
         default_batch_fetch_size: 1000
 
 dexcom:
-  client-id: VdJNsY9IJPm8EFhIRAIQpxH923zeQkAY
-  client-secret: 7Gc2AKoFnPigK0ca
-  redirect-uri: http://localhost:8080/glucose/code
+  client-id: ${CLIENT_ID}
+  client-secret: ${CLIENT_SECRET}
+  redirect-uri: ${REDIRECT_URI}

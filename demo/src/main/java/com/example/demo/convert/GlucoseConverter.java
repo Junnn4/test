@@ -5,13 +5,13 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.example.demo.dto.GlucoseDto;
 import com.example.demo.entity.Dexcom;
 import com.example.demo.entity.Glucose;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class GlucoseConverter {
-
 	private static final ObjectMapper objectMapper = new ObjectMapper();
 
 	public static List<Glucose> fromDexcomJson(Dexcom dexcom, String jsonResponse) {
@@ -30,7 +30,7 @@ public class GlucoseConverter {
 					glucoseList.add(new Glucose(
 						dexcom,
 						record.get("value").asInt(),
-						record.get("displayDevice").asText(),
+						record.get("displayApp").asText(),
 						record.get("trend").asText(),
 						displayTime));
 				}
@@ -39,6 +39,15 @@ public class GlucoseConverter {
 			throw new RuntimeException("Dexcom JSON 파싱 실패", e);
 		}
 		return glucoseList;
+	}
+
+	public static GlucoseDto EntityToDto(Glucose glucose) {
+		return GlucoseDto.builder()
+			.value(glucose.getValue())
+			.displayApp(glucose.getDisplayApp())
+			.trend(glucose.getTrend())
+			.recordedAt(glucose.getRecordedAt())
+			.build();
 	}
 
 }

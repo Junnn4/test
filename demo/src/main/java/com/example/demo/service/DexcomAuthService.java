@@ -1,14 +1,26 @@
 package com.example.demo.service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
 
+import com.example.demo.common.DexcomConfig;
 import com.example.demo.convert.DexcomConverter;
 import com.example.demo.entity.DexcomAuth;
 import com.example.demo.repository.DexcomAuthRepository;
 import com.example.demo.repository.DexcomRepository;
+import com.example.demo.service.DexcomService;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -19,19 +31,60 @@ public class DexcomAuthService {
 
 	private final DexcomAuthRepository dexcomAuthRepository;
 	private final DexcomRepository dexcomRepository;
+	private final DexcomConfig dexcomConfig;
+	private final DexcomService dexcomService;
 
-	public void saveToken(Long userId, String accessToken, String refreshToken) {
+	private final RestTemplate restTemplate = new RestTemplate();
 
-		Long dexcomId = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
-			.getDexcomId();
+	@Transactional
+	public String exchangeCodeToToken(Map<String, String> params, Long userId) {
+		String code = params.get("code");
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-		DexcomAuth dexcomAuth = DexcomConverter.create(dexcomId, accessToken, refreshToken, LocalDateTime.now(), LocalDateTime.now().plusHours(2));
-		dexcomAuthRepository.save(dexcomAuth);
+		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+		body.add("client_id", dexcomConfig.getClientId());
+		body.add("client_secret", dexcomConfig.getClientSecret());
+		body.add("code", code);
+		body.add("grant_type", "authorization_code");
+		body.add("redirect_uri", dexcomConfig.getRedirectUri());
+
+		HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+		ResponseEntity<Map> resp = restTemplate.postForEntity(dexcomConfig.getTOKEN_ENDPOINT(), request, Map.class);
+
+		if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+			String accessToken  = (String) resp.getBody().get("access_token");
+			String refreshToken = (String) resp.getBody().get("refresh_token");
+
+			HttpHeaders deviceHeaders = new HttpHeaders();
+			deviceHeaders.setBearerAuth(accessToken);
+			HttpEntity<Void> deviceRequest = new HttpEntity<>(deviceHeaders);
+
+			ResponseEntity<String> deviceResp = restTemplate.exchange(
+				dexcomConfig.getDEVICE_ENDPOINT(),
+				HttpMethod.GET,
+				deviceRequest,
+				String.class
+			);
+
+			dexcomService.saveDexcomSettingInfo(userId, deviceResp.getBody());
+
+			Long dexcomId = dexcomRepository.findByUserId(userId)
+				.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
+				.getDexcomId();
+
+			DexcomAuth dexcomAuth = DexcomConverter.create(dexcomId, accessToken, refreshToken, LocalDateTime.now(), LocalDateTime.now().plusHours(2));
+			dexcomAuthRepository.save(dexcomAuth);
+
+			log.info("토큰 발급 성공");
+			return "Successfully issued token";
+		} else {
+			log.error("토큰 요청 실패: {}", resp.getStatusCode());
+			return "Failed to issue token";
+		}
 	}
 
-	public String getRefreshTokenByUserId(Long userId) {
-
+	public String refreshAccessToken(Long userId) {
 		Long dexcomId = dexcomRepository.findByUserId(userId)
 			.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
 			.getDexcomId();
@@ -40,7 +93,39 @@ public class DexcomAuthService {
 			.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"))
 			.getRefreshToken();
 
-		return refreshToken;
+		if (refreshToken == null) {
+			log.warn("갱신 시도했으나 refresh_token 없음");
+			return "No exist refresh_token";
+		}
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+		MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+		body.add("client_id", dexcomConfig.getClientId());
+		body.add("client_secret", dexcomConfig.getClientSecret());
+		body.add("grant_type", "refresh_token");
+		body.add("refresh_token", refreshToken);
+
+		HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
+		ResponseEntity<Map> resp = restTemplate.postForEntity(dexcomConfig.getTOKEN_ENDPOINT(), request, Map.class);
+
+		if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+			String newAccessToken = (String) resp.getBody().get("access_token");
+
+			DexcomAuth dexcomAuth = dexcomAuthRepository.findById(dexcomId)
+				.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"));
+
+			dexcomAuth.updateAccessToken(newAccessToken);
+			dexcomAuthRepository.save(dexcomAuth);
+
+
+			log.info("🔁 access_token 갱신 성공");
+			return "access_token 갱신 완료";
+		} else {
+			log.error("토큰 갱신 실패: {}", resp.getStatusCode());
+			return "갱신 실패";
+		}
 	}
 
 	public String getAccessTokenByUserId(Long userId) {
@@ -53,17 +138,5 @@ public class DexcomAuthService {
 			.getAccessToken();
 
 		return accessToken;
-	}
-
-	public void updateAccessTokenByRefreshToken(Long userId, String accessToken) {
-		Long dexcomId = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
-			.getDexcomId();
-
-		DexcomAuth dexcomAuth = dexcomAuthRepository.findById(dexcomId)
-			.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"));
-
-		dexcomAuth.updateAccessToken(accessToken);
-			dexcomAuthRepository.save(dexcomAuth);
 	}
 }

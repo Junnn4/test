@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS `dexcom` (
 CREATE TABLE IF NOT EXISTS `dexcom_auth` (
     `dexcom_id`			BIGINT			NOT NULL PRIMARY KEY,
     `access_token`		TEXT			NULL,
-    `refresh_token`		VARCHAR(255)	NULL,
+    `refresh_token`		TEXT        	NULL,
     `updated_at`		TIMESTAMP		NULL,
     `expires_in`		TIMESTAMP		NULL
     );
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `glucose` (
     `glucose_value_id`	BIGINT			NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `dexcom_id`			BIGINT			NOT NULL,
     `value`				INT			    NULL,
-    `device_source`		VARCHAR(100)	NULL,
+    `displayApp`		VARCHAR(100)	NULL,
     `trend`				VARCHAR(20)		NULL,
     `recorded_at`		TIMESTAMP		NOT NULL
 );
