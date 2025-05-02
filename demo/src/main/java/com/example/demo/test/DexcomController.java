@@ -156,4 +156,15 @@ public class DexcomController {
 	) {
 		return glucoseService.getMyAllEgvs(dexcomId);
 	}
+
+
+	@GetMapping("/{dexcomId}/egvs/period")
+	public ResponseEntity<String> saveEgvsWithPeriod(
+		@PathVariable Long dexcomId,
+		@RequestParam String startDate,
+		@RequestParam String endDate
+	) {
+		String result = glucoseService.saveEgvsWithPeriod(dexcomId, startDate, endDate);
+		return ResponseEntity.ok(result);
+	}
 }

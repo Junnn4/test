@@ -140,5 +140,56 @@ public class GlucoseService {
 			.toList();
 	}
 
+
+	@Transactional
+	public String saveEgvsWithPeriod(Long dexcomId, String startDate, String endDate) {
+		// 1) 액세스 토큰 & Dexcom 엔티티 가져오기
+		String accessToken = dexcomAuthRepository.getAccessTokenByDexcomId(dexcomId);
+		Dexcom dexcom = dexcomRepository.findById(dexcomId)
+			.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"));
+
+		if (accessToken == null) {
+			return "유효하지 않거나 엑세스 토큰이 없습니다.";
+		}
+
+		// 2) 파라미터로 받은 기간 파싱 (예외 던지거나 메시지 반환해도 좋습니다)
+		LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
+		LocalDateTime end   = LocalDateTime.parse(endDate,   isoFormatter);
+
+		// 3) Dexcom EGV API 호출
+		String url = dexcomConfig.getEGV_ENDPOINT()
+			+ "?startDate=" + isoFormatter.format(start)
+			+ "&endDate="   + isoFormatter.format(end);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(accessToken);
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		HttpEntity<Void> request = new HttpEntity<>(headers);
+
+		ResponseEntity<String> resp = restTemplate.exchange(
+			url, HttpMethod.GET, request, String.class
+		);
+
+		log.info("Dexcom raw body: {}", resp.getBody());
+
+		try {
+			// 4) JSON → 엔티티 리스트 변환
+			List<Glucose> glucoseList = GlucoseConverter.fromDexcomJson(dexcom, resp.getBody());
+
+			// 5) 만약 lastEgvTime을 업데이트하고 싶다면 가장 최신값으로 덮어쓰기
+			glucoseList.stream()
+				.map(Glucose::getRecordedAt)
+				.max(LocalDateTime::compareTo)
+				.ifPresent(dexcom::setLastEgvTime);
+
+			// 6) DB에 저장
+			glucoseRepository.saveAll(glucoseList);
+
+			return String.format("혈당 데이터 저장 완료 (%s ~ %s)", startDate, endDate);
+		} catch (Exception e) {
+			log.error("혈당 데이터 저장 실패", e);
+			return "혈당 데이터 저장 실패";
+		}
+	}
 }
 
