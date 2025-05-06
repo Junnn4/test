@@ -97,13 +97,13 @@ public class GlucoseService {
 			return null;
 		}
 
-		return glucoseRepository.findByDexcomIdAndTimeBetween(dexcomId, start, end).stream()
+		return glucoseRepository.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId, start, end).stream()
 			.map(GlucoseConverter::EntityToDto)
 			.toList();
 	}
 
 	public List<GlucoseDto> getMyAllEgvs(Long dexcomId) {
-		return glucoseRepository.findByDexcomId(dexcomId).stream()
+		return glucoseRepository.findByDexcom_DexcomId(dexcomId).stream()
 			.map(GlucoseConverter::EntityToDto)
 			.toList();
 	}

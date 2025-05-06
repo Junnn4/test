@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
+import com.example.demo.repository.DexcomAuthRepository;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -30,8 +31,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DexcomService {
 	private final DexcomRepository dexcomRepository;
-	private final DexcomAuthService dexcomAuthService;
 	private final DexcomConfig dexcomConfig;
+	private final DexcomAuthRepository dexcomAuthRepository;
 
 	private final RestTemplate restTemplate = new RestTemplate();
 
@@ -92,7 +93,10 @@ public class DexcomService {
 		Dexcom dexcom = dexcomRepository.findByUserId(userId)
 			.orElseThrow(() -> new IllegalArgumentException("해당 유저의 Dexcom 정보가 없습니다."));
 
-		String accessToken = dexcomAuthService.getAccessTokenByUserId(userId);
+		String accessToken = dexcomAuthRepository.findById(dexcom.getDexcomId())
+				.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"))
+				.getAccessToken();
+
 
 		if (accessToken == null) {
 			return "access_token 없음. 먼저 인증하세요.";

@@ -127,16 +127,4 @@ public class DexcomAuthService {
 			return "갱신 실패";
 		}
 	}
-
-	public String getAccessTokenByUserId(Long userId) {
-		Long dexcomId = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
-			.getDexcomId();
-
-		String accessToken = dexcomAuthRepository.findById(dexcomId)
-			.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"))
-			.getAccessToken();
-
-		return accessToken;
-	}
 }

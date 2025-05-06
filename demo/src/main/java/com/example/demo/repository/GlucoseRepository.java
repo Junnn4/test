@@ -11,9 +11,9 @@ import com.example.demo.entity.Glucose;
 
 public interface GlucoseRepository extends JpaRepository<Glucose, Long> {
 
-	List<Glucose> findByDexcomIdAndTimeBetween(Long dexcomId, LocalDateTime start, LocalDateTime end);
+	List<Glucose> findByDexcom_DexcomIdAndRecordedAtBetween(Long dexcomId, LocalDateTime start, LocalDateTime end);
 
-	List<Glucose> findByDexcomId(Long dexcomId);
+	List<Glucose> findByDexcom_DexcomId(Long dexcomId);
 
 	@Query("SELECT g.recordedAt FROM Glucose g WHERE g.dexcom.dexcomId = :dexcomId AND g.recordedAt IN :times")
 	List<LocalDateTime> findTimesByDexcomIdAndTimeIn(
