@@ -15,10 +15,9 @@ import org.springframework.web.client.RestTemplate;
 
 import com.example.demo.common.DexcomConfig;
 import com.example.demo.convert.DexcomConverter;
+import com.example.demo.entity.Dexcom;
 import com.example.demo.entity.DexcomAuth;
 import com.example.demo.repository.DexcomAuthRepository;
-import com.example.demo.repository.DexcomRepository;
-import com.example.demo.service.DexcomService;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class DexcomAuthService {
 
-	private final DexcomAuthRepository dexcomAuthRepository;
-	private final DexcomRepository dexcomRepository;
 	private final DexcomConfig dexcomConfig;
 	private final DexcomService dexcomService;
+	private final DexcomAuthRepository dexcomAuthRepository;
 
 	private final RestTemplate restTemplate = new RestTemplate();
 
@@ -67,13 +65,9 @@ public class DexcomAuthService {
 				String.class
 			);
 
-			dexcomService.saveDexcomSettingInfo(userId, deviceResp.getBody());
+			Dexcom dexcom = dexcomService.saveDexcomSettingInfo(userId, deviceResp.getBody());
 
-			Long dexcomId = dexcomRepository.findByUserId(userId)
-				.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
-				.getDexcomId();
-
-			DexcomAuth dexcomAuth = DexcomConverter.create(dexcomId, accessToken, refreshToken, LocalDateTime.now(), LocalDateTime.now().plusHours(2));
+			DexcomAuth dexcomAuth = DexcomConverter.create(dexcom.getDexcomId(), accessToken, refreshToken, LocalDateTime.now(), LocalDateTime.now().plusHours(2));
 			dexcomAuthRepository.save(dexcomAuth);
 
 			log.info("토큰 발급 성공");
@@ -85,15 +79,10 @@ public class DexcomAuthService {
 	}
 
 	public String refreshAccessToken(Long userId) {
-		Long dexcomId = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new RuntimeException("Dexcom 정보 없음"))
-			.getDexcomId();
+		DexcomAuth auth = dexcomAuthRepository.findByDexcom_UserId(userId)
+			.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"));
 
-		String refreshToken = dexcomAuthRepository.findById(dexcomId)
-			.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"))
-			.getRefreshToken();
-
-		if (refreshToken == null) {
+		if (auth.getRefreshToken() == null) {
 			log.warn("갱신 시도했으나 refresh_token 없음");
 			return "No exist refresh_token";
 		}
@@ -105,7 +94,7 @@ public class DexcomAuthService {
 		body.add("client_id", dexcomConfig.getClientId());
 		body.add("client_secret", dexcomConfig.getClientSecret());
 		body.add("grant_type", "refresh_token");
-		body.add("refresh_token", refreshToken);
+		body.add("refresh_token", auth.getRefreshToken());
 
 		HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 		ResponseEntity<Map> resp = restTemplate.postForEntity(dexcomConfig.getTOKEN_ENDPOINT(), request, Map.class);
@@ -113,12 +102,8 @@ public class DexcomAuthService {
 		if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
 			String newAccessToken = (String) resp.getBody().get("access_token");
 
-			DexcomAuth dexcomAuth = dexcomAuthRepository.findById(dexcomId)
-				.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"));
-
-			dexcomAuth.updateAccessToken(newAccessToken);
-			dexcomAuthRepository.save(dexcomAuth);
-
+			auth.updateAccessToken(newAccessToken);
+			dexcomAuthRepository.save(auth);
 
 			log.info("🔁 access_token 갱신 성공");
 			return "access_token 갱신 완료";

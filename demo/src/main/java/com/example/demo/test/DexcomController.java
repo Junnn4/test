@@ -6,17 +6,11 @@ import lombok.RequiredArgsConstructor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -101,6 +95,16 @@ public class DexcomController {
 		return ResponseEntity.ok().body(glucoseService.saveEgvs(dexcomId));
 	}
 
+	@GetMapping("/{dexcomId}/egvs/period")
+	public ResponseEntity<String> saveEgvsWithPeriod(
+		@PathVariable Long dexcomId,
+		@RequestParam String startDate,
+		@RequestParam String endDate
+	) {
+		String result = glucoseService.saveEgvsWithPeriod(dexcomId, startDate, endDate);
+		return ResponseEntity.ok(result);
+	}
+
 	/*
 	 * 기기정보
 	 * */
@@ -143,7 +147,6 @@ public class DexcomController {
 		@RequestParam(required = false) String startDate,
 		@RequestParam(required = false) String endDate
 	) {
-
 		return glucoseService.getMyEgvs(dexcomId, startDate, endDate);
 	}
 
@@ -155,16 +158,5 @@ public class DexcomController {
 		@PathVariable Long dexcomId
 	) {
 		return glucoseService.getMyAllEgvs(dexcomId);
-	}
-
-
-	@GetMapping("/{dexcomId}/egvs/period")
-	public ResponseEntity<String> saveEgvsWithPeriod(
-		@PathVariable Long dexcomId,
-		@RequestParam String startDate,
-		@RequestParam String endDate
-	) {
-		String result = glucoseService.saveEgvsWithPeriod(dexcomId, startDate, endDate);
-		return ResponseEntity.ok(result);
 	}
 }

@@ -108,8 +108,23 @@
     <pre id="periodEgvsOutput">(저장 결과 메시지)</pre>
 </section>
 
+<!-- 10) Min/Max 설정 -->
+<section>
+    <h2>10. Min/Max 혈당 설정</h2>
+    <label>
+        Min Glucose:
+        <input id="inputMinGlucose" type="number" value="70" />
+    </label>
+    <label>
+        Max Glucose:
+        <input id="inputMaxGlucose" type="number" value="180" />
+    </label>
+    <button id="btn-set-glucose">설정 저장</button>
+    <pre id="setGlucoseOutput">(설정 결과 메시지)</pre>
+</section>
+
 <script>
-    // 1) 로그인 → OAuth 인증 페이지로 리디렉트
+    // 1) 로그인
     document.getElementById('btn-login').addEventListener('click', () => {
         window.location.href = '/api/v1/glucose/auth';
     });
@@ -122,21 +137,21 @@
         }
     });
 
-    // 3) 기기 정보 조회
+    // 3) 기기 정보
     document.getElementById('btn-device').addEventListener('click', async () => {
         const res = await fetch('/api/v1/glucose/device');
         const text = await res.text();
         document.getElementById('deviceOutput').textContent = text;
     });
 
-    // 4) 내 설정 조회
+    // 4) 설정 조회
     document.getElementById('btn-settings').addEventListener('click', async () => {
         const res = await fetch('/api/v1/glucose/my/setting');
         const data = await res.json();
         document.getElementById('settingsOutput').textContent = JSON.stringify(data, null, 2);
     });
 
-    // 5) Access Token 갱신
+    // 5) 토큰 갱신
     document.getElementById('btn-refresh').addEventListener('click', async () => {
         const res = await fetch('/api/v1/glucose/refresh', { method: 'POST' });
         const text = await res.text();
@@ -156,8 +171,7 @@
         const dexcomId = document.getElementById('inputMyDexcomId').value;
         const start = encodeURIComponent(document.getElementById('inputStart').value);
         const end   = encodeURIComponent(document.getElementById('inputEnd').value);
-        const url   = `/api/v1/glucose/my/${dexcomId}/egvs?startDate=${start}&endDate=${end}`;
-        const res   = await fetch(url);
+        const res   = await fetch(`/api/v1/glucose/my/${dexcomId}/egvs?startDate=${start}&endDate=${end}`);
         const data  = await res.json();
         document.getElementById('myEgvsOutput').textContent = JSON.stringify(data, null, 2);
     });
@@ -170,15 +184,25 @@
         document.getElementById('allEgvsOutput').textContent = JSON.stringify(data, null, 2);
     });
 
-    // 9) 기간 지정 EGVS 저장
+    // 9) 기간 EGVS 저장
     document.getElementById('btn-save-egvs-period').addEventListener('click', async () => {
         const dexcomId = document.getElementById('inputPeriodDexcomId').value;
         const start    = encodeURIComponent(document.getElementById('inputPeriodStart').value);
         const end      = encodeURIComponent(document.getElementById('inputPeriodEnd').value);
-        const url      = `/api/v1/glucose/${dexcomId}/egvs/period?startDate=${start}&endDate=${end}`;
-        const res      = await fetch(url);
+        const res      = await fetch(`/api/v1/glucose/${dexcomId}/egvs/period?startDate=${start}&endDate=${end}`);
         const text     = await res.text();
         document.getElementById('periodEgvsOutput').textContent = text;
+    });
+
+    // 10) Min/Max 설정
+    document.getElementById('btn-set-glucose').addEventListener('click', async () => {
+        const min = document.getElementById('inputMinGlucose').value;
+        const max = document.getElementById('inputMaxGlucose').value;
+        const res = await fetch(`/api/v1/glucose/setting?min=${min}&max=${max}`, {
+            method: 'PUT'
+        });
+        const text = await res.text();
+        document.getElementById('setGlucoseOutput').textContent = text;
     });
 </script>
 </body>

@@ -32,3 +32,7 @@ dexcom:
   client-id: ${CLIENT_ID}
   client-secret: ${CLIENT_SECRET}
   redirect-uri: ${REDIRECT_URI}
+  client-id-sendbox: ${CLIENT_ID_SENDBOX}
+  client-secret-sendbox: ${CLIENT_SECRET_SENDBOX}
+  redirect-uri-sendbox: ${REDIRECT_URI_SENDBOX}
+

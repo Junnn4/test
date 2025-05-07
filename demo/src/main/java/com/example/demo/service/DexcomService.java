@@ -19,7 +19,6 @@ import com.example.demo.convert.DexcomConverter;
 import com.example.demo.dto.DexcomDto;
 import com.example.demo.entity.Dexcom;
 import com.example.demo.repository.DexcomRepository;
-import com.example.demo.service.DexcomService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -30,14 +29,15 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class DexcomService {
-	private final DexcomRepository dexcomRepository;
+
 	private final DexcomConfig dexcomConfig;
+	private final DexcomRepository dexcomRepository;
 	private final DexcomAuthRepository dexcomAuthRepository;
 
 	private final RestTemplate restTemplate = new RestTemplate();
 
 	@Transactional
-	public void saveDexcomSettingInfo(Long userId, String responseBody) {
+	public Dexcom saveDexcomSettingInfo(Long userId, String responseBody) {
 		try {
 			ObjectMapper mapper = new ObjectMapper();
 			JsonNode root = mapper.readTree(responseBody);
@@ -54,6 +54,7 @@ public class DexcomService {
 			OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
 			String isConnected = uploadTime.plusHours(6).isBefore(now) ? "disconnected" : "connected";
+			log.info("마지막 업로드 시간: {}",uploadTime.toString());
 
 			Integer maxGlucose = 250;
 			Integer minGlucose = 70;
@@ -77,11 +78,20 @@ public class DexcomService {
 
 			LocalDateTime lastEgvTime = uploadTime.toLocalDateTime();  // OffsetDateTime → LocalDateTime 변환
 
-			Dexcom dexcom = DexcomConverter.createInfo(userId, isConnected, maxGlucose, minGlucose, lastEgvTime);
+			Integer finalMaxGlucose = maxGlucose;
+			Integer finalMinGlucose = minGlucose;
+			Dexcom dexcom = dexcomRepository.findByUserId(userId)
+				.map(existing -> {
+					existing.setIsConnected(isConnected);
+					existing.setLastEgvTime(lastEgvTime);
+					return existing;
+				})
+				.orElseGet(() -> DexcomConverter.createInfo(userId, isConnected, finalMaxGlucose, finalMinGlucose, lastEgvTime));
+
 			dexcomRepository.save(dexcom);
 
 			log.info("Dexcom 설정 정보 저장 완료: 상태={}, max={}, min={}, time={}", isConnected, maxGlucose, minGlucose, lastEgvTime);
-
+			return dexcom;
 		} catch (Exception e) {
 			log.error("Dexcom 설정 정보 파싱 실패", e);
 			throw new RuntimeException("Dexcom 설정 정보 저장 실패", e);

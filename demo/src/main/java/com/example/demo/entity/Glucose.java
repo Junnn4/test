@@ -27,8 +27,8 @@ public class Glucose {
 	@Column(name = "value", nullable = false)
 	private Integer value;
 
-	@Column(name = "display_app", length = 100)
-	private String displayApp;
+	@Column(name = "transmitter_generation", length = 20)
+	private String transmitterGeneration;
 
 	@Column(name = "trend", length = 20)
 	private String trend;
@@ -36,10 +36,10 @@ public class Glucose {
 	@Column(name = "recorded_at", nullable = false)
 	private LocalDateTime recordedAt;
 
-	public Glucose(Dexcom dexcom, Integer value, String displayApp, String trend, LocalDateTime recordedAt) {
+	public Glucose(Dexcom dexcom, Integer value, String transmitterGeneration, String trend, LocalDateTime recordedAt) {
 		this.dexcom = dexcom;
 		this.value = value;
-		this.displayApp = displayApp;
+		this.transmitterGeneration = transmitterGeneration;
 		this.trend = trend;
 		this.recordedAt = recordedAt;
 	}

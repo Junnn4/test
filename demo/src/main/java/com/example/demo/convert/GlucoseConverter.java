@@ -30,7 +30,7 @@ public class GlucoseConverter {
 					glucoseList.add(new Glucose(
 						dexcom,
 						record.get("value").asInt(),
-						record.get("displayApp").asText(),
+						record.get("transmitterGeneration").asText(),
 						record.get("trend").asText(),
 						displayTime));
 				}
@@ -44,10 +44,9 @@ public class GlucoseConverter {
 	public static GlucoseDto EntityToDto(Glucose glucose) {
 		return GlucoseDto.builder()
 			.value(glucose.getValue())
-			.displayApp(glucose.getDisplayApp())
+			.displayApp(glucose.getTransmitterGeneration())
 			.trend(glucose.getTrend())
 			.recordedAt(glucose.getRecordedAt())
 			.build();
 	}
-
 }

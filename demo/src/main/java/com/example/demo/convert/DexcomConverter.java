@@ -7,7 +7,7 @@ import com.example.demo.entity.Dexcom;
 import com.example.demo.entity.DexcomAuth;
 
 public class DexcomConverter {
-	public static Dexcom createInfo(Long userId, String isConnected, Integer maxGlucose, Integer minGlucose, LocalDateTime lastEgvTime) {
+	public static Dexcom createInfo(Long userId, String isConnected, int maxGlucose, int minGlucose, LocalDateTime lastEgvTime) {
 		return Dexcom.builder()
 			.userId(userId)
 			.isConnected(isConnected)
@@ -16,7 +16,6 @@ public class DexcomConverter {
 			.lastEgvTime(lastEgvTime)
 			.build();
 	}
-
 
 	public static DexcomAuth create(Long dexcomId, String accessToken, String refreshToken, LocalDateTime updatedAt, LocalDateTime expiresAt) {
 		return DexcomAuth.builder()
@@ -36,5 +35,4 @@ public class DexcomConverter {
 			.lastEgvTime(dexcom.getLastEgvTime())
 			.build();
 	}
-
 }
