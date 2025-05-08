@@ -2,6 +2,8 @@ package com.example.demo.entity;
 
 import java.time.LocalDateTime;
 
+import com.example.demo.common.entity.BaseEntity;
+
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -17,7 +19,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Table(name = "dexcom_auth")
-public class DexcomAuth {
+public class DexcomAuth extends BaseEntity {
 
 	@Id
 	@Column(name = "dexcom_id", nullable = false)
@@ -33,8 +35,8 @@ public class DexcomAuth {
 	@Column(name = "refresh_token", length = 255)
 	private String refreshToken;
 
-	@Column(name = "updated_at")
-	private LocalDateTime updatedAt; // 리프레시 토큰 발급 시간
+	@Column(name = "issued_at")
+	private LocalDateTime issuedAt; // 리프레시 토큰 발급 시간
 
 	@Column(name = "expires_in")
 	private LocalDateTime expiresIn; // 엑세스 토큰 만료 시간

@@ -51,10 +51,6 @@
 <!-- 6) EGVS 저장 (스케줄 대신 수동 호출) -->
 <section>
     <h2>6. EGVS 저장</h2>
-    <label>
-        Dexcom ID:
-        <input id="inputSaveDexcomId" type="number" value="1" />
-    </label>
     <button id="btn-save-egvs">EGVS 저장하기</button>
     <pre id="saveEgvsOutput">(저장 결과 메시지)</pre>
 </section>
@@ -62,10 +58,6 @@
 <!-- 7) 특정 기간 EGVS 조회 -->
 <section>
     <h2>7. 특정 기간 EGVS 조회</h2>
-    <label>
-        Dexcom ID:
-        <input id="inputMyDexcomId" type="number" value="1" />
-    </label>
     <label>
         Start Date (ISO):
         <input id="inputStart" placeholder="2025-05-01T00:00:00" />
@@ -81,10 +73,6 @@
 <!-- 8) 전체 EGVS 조회 -->
 <section>
     <h2>8. 전체 EGVS 조회</h2>
-    <label>
-        Dexcom ID:
-        <input id="inputAllDexcomId" type="number" value="1" />
-    </label>
     <button id="btn-all-egvs">전체 EGVS 조회</button>
     <pre id="allEgvsOutput">(전체 혈당 데이터)</pre>
 </section>
@@ -92,10 +80,6 @@
 <!-- 9) 기간 지정 EGVS 저장 -->
 <section>
     <h2>9. 기간 지정 EGVS 저장</h2>
-    <label>
-        Dexcom ID:
-        <input id="inputPeriodDexcomId" type="number" value="1" />
-    </label>
     <label>
         Start Date (ISO):
         <input id="inputPeriodStart" placeholder="2025-05-01T00:00:00" />
@@ -123,6 +107,13 @@
     <pre id="setGlucoseOutput">(설정 결과 메시지)</pre>
 </section>
 
+<!-- 11) 혈당 레벨 통계 -->
+<section>
+    <h2>11. 혈당 레벨 통계 조회</h2>
+    <button id="btn-level-counts">혈당 레벨 통계 조회</button>
+    <pre id="levelCountsOutput">(매우 낮음 ~ 매우 높음 구간별 개수)</pre>
+</section>
+
 <script>
     // 1) 로그인
     document.getElementById('btn-login').addEventListener('click', () => {
@@ -140,69 +131,61 @@
     // 3) 기기 정보
     document.getElementById('btn-device').addEventListener('click', async () => {
         const res = await fetch('/api/v1/glucose/device');
-        const text = await res.text();
-        document.getElementById('deviceOutput').textContent = text;
+        document.getElementById('deviceOutput').textContent = await res.text();
     });
 
     // 4) 설정 조회
     document.getElementById('btn-settings').addEventListener('click', async () => {
         const res = await fetch('/api/v1/glucose/my/setting');
-        const data = await res.json();
-        document.getElementById('settingsOutput').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('settingsOutput').textContent = JSON.stringify(await res.json(), null, 2);
     });
 
     // 5) 토큰 갱신
     document.getElementById('btn-refresh').addEventListener('click', async () => {
         const res = await fetch('/api/v1/glucose/refresh', { method: 'POST' });
-        const text = await res.text();
-        document.getElementById('refreshOutput').textContent = text;
+        document.getElementById('refreshOutput').textContent = await res.text();
     });
 
     // 6) EGVS 저장
     document.getElementById('btn-save-egvs').addEventListener('click', async () => {
-        const dexcomId = document.getElementById('inputSaveDexcomId').value;
-        const res = await fetch(`/api/v1/glucose/${dexcomId}/egvs`);
-        const text = await res.text();
-        document.getElementById('saveEgvsOutput').textContent = text;
+        const res = await fetch('/api/v1/glucose/egvs');
+        document.getElementById('saveEgvsOutput').textContent = await res.text();
     });
 
     // 7) 특정 기간 EGVS 조회
     document.getElementById('btn-my-egvs').addEventListener('click', async () => {
-        const dexcomId = document.getElementById('inputMyDexcomId').value;
         const start = encodeURIComponent(document.getElementById('inputStart').value);
         const end   = encodeURIComponent(document.getElementById('inputEnd').value);
-        const res   = await fetch(`/api/v1/glucose/my/${dexcomId}/egvs?startDate=${start}&endDate=${end}`);
-        const data  = await res.json();
-        document.getElementById('myEgvsOutput').textContent = JSON.stringify(data, null, 2);
+        const res   = await fetch(`/api/v1/glucose/my/egvs?startDate=${start}&endDate=${end}`);
+        document.getElementById('myEgvsOutput').textContent = JSON.stringify(await res.json(), null, 2);
     });
 
     // 8) 전체 EGVS 조회
     document.getElementById('btn-all-egvs').addEventListener('click', async () => {
-        const dexcomId = document.getElementById('inputAllDexcomId').value;
-        const res = await fetch(`/api/v1/glucose/my/all/${dexcomId}/egvs`);
-        const data = await res.json();
-        document.getElementById('allEgvsOutput').textContent = JSON.stringify(data, null, 2);
+        const res = await fetch('/api/v1/glucose/my/egvs/all');
+        document.getElementById('allEgvsOutput').textContent = JSON.stringify(await res.json(), null, 2);
     });
 
     // 9) 기간 EGVS 저장
     document.getElementById('btn-save-egvs-period').addEventListener('click', async () => {
-        const dexcomId = document.getElementById('inputPeriodDexcomId').value;
-        const start    = encodeURIComponent(document.getElementById('inputPeriodStart').value);
-        const end      = encodeURIComponent(document.getElementById('inputPeriodEnd').value);
-        const res      = await fetch(`/api/v1/glucose/${dexcomId}/egvs/period?startDate=${start}&endDate=${end}`);
-        const text     = await res.text();
-        document.getElementById('periodEgvsOutput').textContent = text;
+        const start = encodeURIComponent(document.getElementById('inputPeriodStart').value);
+        const end   = encodeURIComponent(document.getElementById('inputPeriodEnd').value);
+        const res   = await fetch(`/api/v1/glucose/egvs/period?startDate=${start}&endDate=${end}`);
+        document.getElementById('periodEgvsOutput').textContent = await res.text();
     });
 
     // 10) Min/Max 설정
     document.getElementById('btn-set-glucose').addEventListener('click', async () => {
         const min = document.getElementById('inputMinGlucose').value;
         const max = document.getElementById('inputMaxGlucose').value;
-        const res = await fetch(`/api/v1/glucose/setting?min=${min}&max=${max}`, {
-            method: 'PUT'
-        });
-        const text = await res.text();
-        document.getElementById('setGlucoseOutput').textContent = text;
+        const res = await fetch(`/api/v1/glucose/setting?min=${min}&max=${max}`, { method: 'PUT' });
+        document.getElementById('setGlucoseOutput').textContent = await res.text();
+    });
+
+    // 11) 혈당 레벨 통계 조회
+    document.getElementById('btn-level-counts').addEventListener('click', async () => {
+        const res = await fetch('/api/v1/glucose/my/egvs/level');
+        document.getElementById('levelCountsOutput').textContent = JSON.stringify(await res.json(), null, 2);
     });
 </script>
 </body>

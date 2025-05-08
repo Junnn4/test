@@ -17,12 +17,12 @@ public class DexcomConverter {
 			.build();
 	}
 
-	public static DexcomAuth create(Long dexcomId, String accessToken, String refreshToken, LocalDateTime updatedAt, LocalDateTime expiresAt) {
+	public static DexcomAuth create(Long dexcomId, String accessToken, String refreshToken, LocalDateTime issuedAt, LocalDateTime expiresAt) {
 		return DexcomAuth.builder()
 			.dexcomId(dexcomId)
 			.accessToken(accessToken)
 			.refreshToken(refreshToken)
-			.updatedAt(updatedAt)
+			.issuedAt(issuedAt)
 			.expiresIn(expiresAt)
 			.build();
 	}

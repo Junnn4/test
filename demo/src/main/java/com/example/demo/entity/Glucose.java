@@ -2,6 +2,8 @@ package com.example.demo.entity;
 
 import java.time.LocalDateTime;
 
+import com.example.demo.common.entity.BaseEntity;
+
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -12,8 +14,8 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
-@Table(name = "glucose")
-public class Glucose {
+@Table(name = "glucose", uniqueConstraints = @UniqueConstraint(columnNames = {"dexcom_id", "recorded_at"}))
+public class Glucose extends BaseEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,7 +24,7 @@ public class Glucose {
 
 	@ManyToOne
 	@JoinColumn(name = "dexcom_id", nullable = false)
-	private Dexcom dexcom; // FK
+	private Dexcom dexcom;
 
 	@Column(name = "value", nullable = false)
 	private Integer value;

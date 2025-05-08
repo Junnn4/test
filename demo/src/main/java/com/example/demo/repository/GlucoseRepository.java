@@ -15,9 +15,10 @@ public interface GlucoseRepository extends JpaRepository<Glucose, Long> {
 
 	List<Glucose> findByDexcom_DexcomId(Long dexcomId);
 
-	@Query("SELECT g.recordedAt FROM Glucose g WHERE g.dexcom.dexcomId = :dexcomId AND g.recordedAt IN :times")
-	List<LocalDateTime> findTimesByDexcomIdAndTimeIn(
+	@Query("SELECT g.recordedAt FROM Glucose g WHERE g.dexcom.dexcomId = :dexcomId AND g.recordedAt BETWEEN :start AND :end")
+	List<LocalDateTime> findTimesByDexcomIdAndTimeRange(
 		@Param("dexcomId") Long dexcomId,
-		@Param("times") List<LocalDateTime> times
+		@Param("start") LocalDateTime start,
+		@Param("end") LocalDateTime end
 	);
 }

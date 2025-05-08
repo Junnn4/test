@@ -3,7 +3,11 @@ package com.example.demo.service;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 
+import com.example.demo.common.error.GlobalErrorCodes;
+import com.example.demo.common.exception.BusinessException;
+import com.example.demo.entity.DexcomAuth;
 import com.example.demo.repository.DexcomAuthRepository;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -43,18 +47,32 @@ public class DexcomService {
 			JsonNode root = mapper.readTree(responseBody);
 			JsonNode records = root.get("records");
 
-			if (!records.isArray() || records.isEmpty()) {
-				throw new RuntimeException("기기 정보 없음");
+			if (records == null) {
+				log.error("Dexcom 응답에 'records' 필드가 없습니다. responseBody={}", responseBody);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM_RECORDS_MISSING);
 			}
-
+			if (!records.isArray() || records.isEmpty()) {
+				log.error("Dexcom 'records' 배열이 비어 있거나 잘못된 형식입니다. records={}", records);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM_RECORDS_EMPTY);
+			}
 			JsonNode device = records.get(0);
-
 			String lastUpload = device.get("lastUploadDate").asText();
-			OffsetDateTime uploadTime = OffsetDateTime.parse(lastUpload);
+			if (lastUpload == null) {
+				log.error("'lastUploadDate' 필드가 없습니다. device={}", device);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM_MISSING_LAST_UPLOAD);
+			}
+			OffsetDateTime uploadTime;
+
+			try {
+				uploadTime = OffsetDateTime.parse(lastUpload);
+			} catch (DateTimeParseException e) {
+				log.error("'lastUploadDate' 파싱 실패: {}", lastUpload, e);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM_LAST_UPLOAD_PARSE_ERROR);
+			}
 			OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
 			String isConnected = uploadTime.plusHours(6).isBefore(now) ? "disconnected" : "connected";
-			log.info("마지막 업로드 시간: {}",uploadTime.toString());
+			log.info("마지막 업로드 시간: {}, 연결 상태: {}", uploadTime, isConnected);
 
 			Integer maxGlucose = 250;
 			Integer minGlucose = 70;
@@ -75,8 +93,7 @@ public class DexcomService {
 					}
 				}
 			}
-
-			LocalDateTime lastEgvTime = uploadTime.toLocalDateTime();  // OffsetDateTime → LocalDateTime 변환
+			LocalDateTime lastEgvTime = uploadTime.toLocalDateTime();
 
 			Integer finalMaxGlucose = maxGlucose;
 			Integer finalMinGlucose = minGlucose;
@@ -94,82 +111,100 @@ public class DexcomService {
 			return dexcom;
 		} catch (Exception e) {
 			log.error("Dexcom 설정 정보 파싱 실패", e);
-			throw new RuntimeException("Dexcom 설정 정보 저장 실패", e);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM_JSON_PARSE_ERROR);
 		}
 	}
 
 	@Transactional
-	public String updateDeviceInfo(Long userId) {
-		Dexcom dexcom = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new IllegalArgumentException("해당 유저의 Dexcom 정보가 없습니다."));
+	public String updateDeviceInfo(Long dexcomId) {
 
-		String accessToken = dexcomAuthRepository.findById(dexcom.getDexcomId())
-				.orElseThrow(() -> new RuntimeException("Dexcom Auth 정보 없음"))
-				.getAccessToken();
+		DexcomAuth auth = dexcomAuthRepository.findByDexcomId(dexcomId)
+			.orElseThrow(() -> {
+				log.error("refreshAccessToken: DexcomAuth 정보 없음 (dexcomId={})", dexcomId);
+				return new BusinessException(GlobalErrorCodes.DEXCOM_AUTH_NOT_FOUND);
+			});
 
+		Dexcom dexcom = auth.getDexcom();
+		String accessToken = auth.getAccessToken();
 
 		if (accessToken == null) {
-			return "access_token 없음. 먼저 인증하세요.";
+			log.warn("updateDeviceInfo: accessToken 없음 (dexcomId={})", dexcom.getDexcomId());
+			throw new BusinessException(GlobalErrorCodes.DEXCOM_NO_ACCESS_TOKEN);
 		}
 
 		String url = dexcomConfig.getDEVICE_ENDPOINT();
-
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(accessToken);
 		headers.setContentType(MediaType.APPLICATION_JSON);
-
 		HttpEntity<Void> request = new HttpEntity<>(headers);
 
 		try {
 			ResponseEntity<String> response = restTemplate.exchange(
-				url,
-				HttpMethod.GET,
-				request,
-				String.class
+				url, HttpMethod.GET, request, String.class
 			);
+			log.info("updateDeviceInfo: Dexcom API 응답 status={}, body={}",
+				response.getStatusCode(), response.getBody());
 
-			ObjectMapper objectMapper = new ObjectMapper();
-			JsonNode root = objectMapper.readTree(response.getBody());
+			ObjectMapper mapper = new ObjectMapper();
+			JsonNode root = mapper.readTree(response.getBody());
+			JsonNode records = root.get("records");
 
-			JsonNode records = root.path("records");
-			if (records.isArray() && records.size() > 0) {
-				JsonNode firstRecord = records.get(0);
-				String lastUploadDateStr = firstRecord.path("lastUploadDate").asText();
-
-				if (!lastUploadDateStr.isEmpty()) {
-					OffsetDateTime uploadTime = OffsetDateTime.parse(lastUploadDateStr);
-					OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-
-					if (uploadTime.plusHours(6).isBefore(now)) {
-						dexcom.setIsConnected("disconnected");
-						dexcomRepository.save(dexcom);
-						return "덱스콤에 연결 되어있지않습니다.";
-					} else {
-						dexcom.setIsConnected("connected");
-						dexcomRepository.save(dexcom);
-						return "덱스콤에 연결 되어있습니다.";
-					}
-				}
+			if (records == null || !records.isArray()) {
+				log.error("updateDeviceInfo: 'records' 필드 누락 또는 잘못된 형식, root={}", root);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM_DEVICE_RECORDS_INVALID);
 			}
-			log.info("Dexcom raw body: {}", response.getBody());
-			log.info("Dexcom HTTP Status code: {}", response.getStatusCode());
+			if (records.isEmpty()) {
+				log.warn("updateDeviceInfo: records 배열이 비어 있음");
+				dexcom.setIsConnected("unknown");
+				dexcomRepository.save(dexcom);
+				return "기기 정보가 부족합니다.";
+			}
 
-			dexcom.setIsConnected("unknown");
+			String lastUploadDateStr = records.get(0).path("lastUploadDate").asText("");
+			if (lastUploadDateStr.isEmpty()) {
+				log.warn("updateDeviceInfo: lastUploadDate 누락, record={}", records.get(0));
+				dexcom.setIsConnected("unknown");
+				dexcomRepository.save(dexcom);
+				return "기기 정보가 부족합니다.";
+			}
+
+			OffsetDateTime uploadTime;
+			try {
+				uploadTime = OffsetDateTime.parse(lastUploadDateStr);
+			} catch (DateTimeParseException e) {
+				log.error("updateDeviceInfo: lastUploadDate 파싱 실패: {}", lastUploadDateStr, e);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM_DEVICE_DATE_PARSE_ERROR);
+			}
+
+			OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+			boolean connected = !uploadTime.plusHours(6).isBefore(now);
+
+			dexcom.setIsConnected(connected ? "connected" : "disconnected");
 			dexcomRepository.save(dexcom);
-			return "기기 정보가 충분하지 않습니다.";
+
+			log.info("updateDeviceInfo: 사용자 기기 {} 기기 연결 상태={} (lastUpload={})",
+				dexcomId, dexcom.getIsConnected(), uploadTime);
+			return connected
+				? "덱스콤에 연결되어 있습니다."
+				: "덱스콤에 연결되어 있지 않습니다.";
+
+		} catch (BusinessException be) {
+			throw be;
 		} catch (Exception e) {
-			log.error("Dexcom 기기 정보 업데이트 중 오류 발생", e);
-			return "에러가 발생했습니다.";
+			log.error("updateDeviceInfo: 알 수 없는 오류 발생", e);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM_DEVICE_UPDATE_FAILED);
 		}
 	}
 
 	@Transactional
 	public String updateMinMaxGlucose(Long userId, Integer min, Integer max) {
 		Dexcom dexcom = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new IllegalArgumentException("해당 유저의 Dexcom 정보가 없습니다."));
+			.orElseThrow(() -> {
+				log.error("updateMinMaxGlucose: 사용자 {} 의 Dexcom 정보 없음", userId);
+				return new BusinessException(GlobalErrorCodes.DEXCOM_NOT_FOUND);
+			});
 
 		boolean updated = false;
-
 		if (min != null && min > 0) {
 			dexcom.setMinGlucose(min);
 			updated = true;
@@ -179,19 +214,28 @@ public class DexcomService {
 			updated = true;
 		}
 
-		if (updated) {
-			log.info("사용자 {}의 min_glucose={}, max_glucose={} 업데이트 완료", userId, min, max);
-			return "success";
-		} else {
-			log.warn("사용자 {}의 설정 실패: min={}, max={}", userId, min, max);
-			return "failed";
+		if (!updated) {
+			log.warn("updateMinMaxGlucose: 유효하지 않은 min/max 입력 (userId={}, min={}, max={})",
+				userId, min, max);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM_INVALID_MIN_MAX);
 		}
+
+		dexcomRepository.save(dexcom);
+		log.info("updateMinMaxGlucose: 사용자 {} 의 min={}, max={} 업데이트 완료",
+			userId, dexcom.getMinGlucose(), dexcom.getMaxGlucose());
+		return "success";
 	}
 
 	public ResponseEntity<DexcomDto> getDexcomInfo(Long userId) {
 		Dexcom dexcom = dexcomRepository.findByUserId(userId)
-			.orElseThrow(() -> new IllegalArgumentException("해당 유저의 Dexcom 정보가 없습니다."));
+			.orElseThrow(() -> {
+				log.error("getDexcomInfo: 사용자 {} 의 Dexcom 정보 없음", userId);
+				return new BusinessException(GlobalErrorCodes.DEXCOM_NOT_FOUND);
+			});
 
-		return ResponseEntity.ok().body(DexcomConverter.EntityToDto(dexcom));
+		DexcomDto dto = DexcomConverter.EntityToDto(dexcom);
+		log.info("getDexcomInfo: 사용자 {} 정보 조회 완료: {}", userId, dto);
+		return ResponseEntity.ok(dto);
 	}
+
 }

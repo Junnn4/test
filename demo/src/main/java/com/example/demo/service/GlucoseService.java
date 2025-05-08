@@ -2,8 +2,12 @@ package com.example.demo.service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -14,11 +18,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.example.demo.common.DexcomConfig;
+import com.example.demo.common.error.GlobalErrorCodes;
+import com.example.demo.common.exception.BusinessException;
 import com.example.demo.convert.GlucoseConverter;
 import com.example.demo.dto.GlucoseDto;
 import com.example.demo.entity.Dexcom;
 import com.example.demo.entity.DexcomAuth;
 import com.example.demo.entity.Glucose;
+import com.example.demo.entity.GlucoseLevel;
 import com.example.demo.repository.DexcomAuthRepository;
 import com.example.demo.repository.GlucoseRepository;
 
@@ -40,176 +47,172 @@ public class GlucoseService {
 
 	@Transactional
 	public String saveEgvs(Long dexcomId) {
-		DexcomAuth dexcomAuth = dexcomAuthRepository.findById(dexcomId)
-			.orElseThrow(()-> new RuntimeException("DexcomAuth 정보 없음"));
+		DexcomAuth auth = dexcomAuthRepository.findByDexcomId(dexcomId)
+			.orElseThrow(() -> {
+				log.error("saveEgvs: DexcomAuth 정보 없음 (dexcomId={})", dexcomId);
+				return new BusinessException(GlobalErrorCodes.DEXCOM201_NO_AUTH);
+			});
 
-		String token = dexcomAuth.getAccessToken();
-		Dexcom dexcom = dexcomAuth.getDexcom();
-
+		String token = auth.getAccessToken();
 		if (token == null) {
-			log.warn("access_token 없음. 먼저 인증하세요.");
-			return "유효하지 않거나 엑세스 토큰이 없습니다.";
+			log.warn("saveEgvs: access_token 없음 (dexcomId={})", dexcomId);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM202_INVALID_TOKEN);
 		}
 
-		LocalDateTime end = LocalDateTime.now();
-
+		Dexcom dexcom = auth.getDexcom();
+		LocalDateTime end   = LocalDateTime.now();
 		LocalDateTime start = (dexcom.getLastEgvTime() != null)
 			? dexcom.getLastEgvTime()
 			: end.minusHours(1);
 
-		String url = dexcomConfig.getEGV_ENDPOINT() +
-			"?startDate=" + isoFormatter.format(start) +
-			"&endDate="   + isoFormatter.format(end);
+		log.info("saveEgvs: 요청 기간 {} ~ {}", isoFormatter.format(start), isoFormatter.format(end));
 
-		log.info("시작 날짜 : {} , 종료 날짜 : {}", isoFormatter.format(start), isoFormatter.format(end));
+		String url = dexcomConfig.getEGV_ENDPOINT()
+			+ "?startDate=" + isoFormatter.format(start)
+			+ "&endDate="   + isoFormatter.format(end);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(token);
 		headers.setContentType(MediaType.APPLICATION_JSON);
-
 		HttpEntity<Void> request = new HttpEntity<>(headers);
-		ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
 
-		log.info("Dexcom raw body: {}", resp.getBody());
+		String raw;
+		try {
+			ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
+			raw = resp.getBody();
+			log.info("saveEgvs: Dexcom raw body: {}", raw);
+		} catch (Exception e) {
+			log.error("saveEgvs: 혈당 데이터 조회 실패 (dexcomId={})", dexcomId, e);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM203_EGV_FETCH_FAILED);
+		}
 
 		try {
-			List<Glucose> glucoseList = GlucoseConverter.fromDexcomJson(dexcom, resp.getBody());
-
-			Optional<LocalDateTime> latestEgvTime = glucoseList.stream()
+			List<Glucose> list = GlucoseConverter.fromDexcomJson(dexcom, raw);
+			list.stream()
 				.map(Glucose::getRecordedAt)
-				.max(LocalDateTime::compareTo);
+				.max(LocalDateTime::compareTo)
+				.ifPresent(dexcom::setLastEgvTime);
 
-			latestEgvTime.ifPresent(dexcom::setLastEgvTime);
-
-			glucoseRepository.saveAll(glucoseList);
-
+			glucoseRepository.saveAll(list);
 			return "혈당 데이터 저장 완료";
 		} catch (Exception e) {
-			log.error("혈당 데이터 저장 실패", e);
-			return "혈당 데이터 저장 실패";
+			log.error("saveEgvs: 혈당 데이터 파싱 실패 (dexcomId={})", dexcomId, e);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM204_JSON_PARSE_FAILED);
 		}
 	}
 
 	@Transactional
 	public String saveEgvsWithPeriod(Long dexcomId, String startDate, String endDate) {
-		DexcomAuth dexcomAuth = dexcomAuthRepository.findById(dexcomId)
-			.orElseThrow(() -> new RuntimeException("DexcomAuth 정보 없음"));
+		DexcomAuth auth = dexcomAuthRepository.findByDexcomId(dexcomId)
+			.orElseThrow(() -> {
+				log.error("saveEgvsWithPeriod: DexcomAuth 정보 없음 (dexcomId={})", dexcomId);
+				return new BusinessException(GlobalErrorCodes.DEXCOM201_NO_AUTH);
+			});
 
-		String token = dexcomAuth.getAccessToken();
-		Dexcom dexcom = dexcomAuth.getDexcom();
-
+		String token = auth.getAccessToken();
 		if (token == null) {
-			return "유효하지 않거나 엑세스 토큰이 없습니다.";
+			log.warn("saveEgvsWithPeriod: access_token 없음 (dexcomId={})", dexcomId);
+			throw new BusinessException(GlobalErrorCodes.DEXCOM202_INVALID_TOKEN);
 		}
 
+		Dexcom dexcom = auth.getDexcom();
 		LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
-		LocalDateTime end = LocalDateTime.parse(endDate, isoFormatter);
+		LocalDateTime end   = LocalDateTime.parse(endDate,   isoFormatter);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(token);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		HttpEntity<Void> request = new HttpEntity<>(headers);
 
-		int totalSaved = 0;
+		int saved = 0;
 		LocalDateTime cursor = start;
 
 		while (cursor.isBefore(end)) {
-			LocalDateTime next = cursor.plusHours(12);
-			if (next.isAfter(end)) {
-				next = end;
-			}
+			LocalDateTime next = cursor.plusHours(12).isAfter(end) ? end : cursor.plusHours(12);
+			log.info("saveEgvsWithPeriod: 요청 기간 {} ~ {}", cursor, next);
 
 			String url = dexcomConfig.getEGV_ENDPOINT()
 				+ "?startDate=" + isoFormatter.format(cursor)
-				+ "&endDate=" + isoFormatter.format(next);
+				+ "&endDate="   + isoFormatter.format(next);
 
-			log.info("⏱ 요청: {} ~ {}", cursor, next);
-
-			ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-			String responseBody = resp.getBody();
-			log.debug("📨 응답 데이터: {}", responseBody);
-
-			List<Glucose> glucoseList;
+			String raw;
 			try {
-				glucoseList = GlucoseConverter.fromDexcomJson(dexcom, responseBody);
+				raw = restTemplate.exchange(url, HttpMethod.GET, request, String.class).getBody();
 			} catch (Exception e) {
-				log.error("❌ JSON 파싱 실패", e);
-				break;
+				log.error("saveEgvsWithPeriod: 혈당 데이터 조회 실패 ({}~{})", cursor, next, e);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM203_EGV_FETCH_FAILED);
 			}
 
-			if (glucoseList.isEmpty()) {
-				log.warn("📭 응답 데이터 없음. 중단: {} ~ {}", cursor, next);
-				break;
+			List<Glucose> list;
+			try {
+				list = GlucoseConverter.fromDexcomJson(dexcom, raw);
+			} catch (Exception e) {
+				log.error("saveEgvsWithPeriod: 혈당 데이터 파싱 실패 ({}~{})", cursor, next, e);
+				throw new BusinessException(GlobalErrorCodes.DEXCOM204_JSON_PARSE_FAILED);
 			}
 
-			// 최신 시간 저장
-			glucoseList.stream()
-				.map(Glucose::getRecordedAt)
-				.max(LocalDateTime::compareTo)
-				.ifPresent(dexcom::setLastEgvTime);
-
-			glucoseRepository.saveAll(glucoseList);
-			totalSaved += glucoseList.size();
+			if (!list.isEmpty()) {
+				glucoseRepository.saveAll(list);
+				saved += list.size();
+				list.stream()
+					.map(Glucose::getRecordedAt)
+					.max(LocalDateTime::compareTo)
+					.ifPresent(dexcom::setLastEgvTime);
+			} else {
+				log.info("saveEgvsWithPeriod: 응답 데이터 없음 ({}~{})", cursor, next);
+			}
 			cursor = next;
 		}
-
-		return String.format("총 %d건의 혈당 데이터를 저장했습니다. (%s ~ %s)", totalSaved, startDate, endDate);
+		return String.format("총 %d건의 혈당 데이터를 저장했습니다. (%s ~ %s)", saved, startDate, endDate);
 	}
 
-
 	public List<GlucoseDto> getMyEgvs(Long dexcomId, String startDate, String endDate) {
+		log.info("getMyEgvs: dexcomId={}, startDate={}, endDate={}", dexcomId, startDate, endDate);
 		DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
 		LocalDateTime start = LocalDateTime.parse(startDate, formatter);
 		LocalDateTime end = LocalDateTime.parse(endDate, formatter);
 
-		if(startDate == null || endDate == null) {
-			return null;
+		if (startDate == null || endDate == null) {
+			log.error("getMyEgvs: 기간 파라미터 누락");
+			throw new BusinessException(GlobalErrorCodes.DEXCOM205_INVALID_PERIOD);
 		}
 
-		return glucoseRepository.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId, start, end).stream()
-			.map(GlucoseConverter::EntityToDto)
-			.toList();
+		try {
+			List<Glucose> entities = glucoseRepository
+				.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId, start, end);
+			return entities.stream()
+				.map(GlucoseConverter::EntityToDto)
+				.toList();
+		} catch (Exception e) {
+			log.error("getMyEgvs: DB 조회 실패 (dexcomId={}, {}~{})", dexcomId, startDate, endDate, e);
+			throw new BusinessException(GlobalErrorCodes.INTERNAL_SERVER_ERROR);
+		}
 	}
 
 	public List<GlucoseDto> getMyAllEgvs(Long dexcomId) {
-		return glucoseRepository.findByDexcom_DexcomId(dexcomId).stream()
-			.map(GlucoseConverter::EntityToDto)
-			.toList();
+		log.info("getMyAllEgvs: dexcomId={}", dexcomId);
+		try {
+			List<Glucose> entities = glucoseRepository.findByDexcom_DexcomId(dexcomId);
+			return entities.stream()
+				.map(GlucoseConverter::EntityToDto)
+				.toList();
+		} catch (Exception e) {
+			log.error("getMyAllEgvs: DB 조회 실패 (dexcomId={})", dexcomId, e);
+			throw new BusinessException(GlobalErrorCodes.INTERNAL_SERVER_ERROR);
+		}
 	}
 
-	public List<Glucose> fetchAndFilterNewGlucose(Dexcom dexcom) {
-		String token = dexcomAuthRepository.findByDexcomId(dexcom.getDexcomId())
-			.orElseThrow(() -> new RuntimeException("토큰 정보 없음"))
-			.getAccessToken();
-
-		if (token == null) return List.of();
-
-		LocalDateTime start = dexcom.getLastEgvTime() != null ? dexcom.getLastEgvTime() : LocalDateTime.now().minusHours(1);
-		LocalDateTime end = LocalDateTime.now();
-
-		String url = dexcomConfig.getEGV_ENDPOINT() +
-			"?startDate=" + isoFormatter.format(start) +
-			"&endDate="   + isoFormatter.format(end);
-
-		HttpHeaders headers = new HttpHeaders();
-		headers.setBearerAuth(token);
-		headers.setContentType(MediaType.APPLICATION_JSON);
-		HttpEntity<Void> request = new HttpEntity<>(headers);
-
-		ResponseEntity<String> resp = restTemplate.exchange(url, HttpMethod.GET, request, String.class);
-		List<Glucose> glucoseList = GlucoseConverter.fromDexcomJson(dexcom, resp.getBody());
-
-		if (glucoseList.isEmpty()) return List.of();
-
-		// 중복 제거용: 한 번에 기존 시간 조회
-		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeIn(
-			dexcom.getDexcomId(),
-			glucoseList.stream().map(Glucose::getRecordedAt).toList()
-		);
-
-		return glucoseList.stream()
-			.filter(glucose -> !existingTimes.contains(glucose.getRecordedAt()))
-			.toList();
+	public Map<String, Long> getGlucoseLevelCounts(Long dexcomId) {
+		log.info("getGlucoseLevelCounts: dexcomId={}", dexcomId);
+		try {
+			List<Glucose> list = glucoseRepository.findByDexcom_DexcomId(dexcomId);
+			return list.stream()
+				.map(g -> GlucoseLevel.getLevel(g.getValue()))
+				.collect(Collectors.groupingBy(level -> level, Collectors.counting()));
+		} catch (Exception e) {
+			log.error("getGlucoseLevelCounts: DB 조회 실패 (dexcomId={})", dexcomId, e);
+			throw new BusinessException(GlobalErrorCodes.INTERNAL_SERVER_ERROR);
+		}
 	}
 }
 

@@ -80,27 +80,31 @@ public class DexcomController {
 	@PostMapping("/refresh")
 	public ResponseEntity<String> refreshAccessToken() {
 		// 추후 수정
-		Long userId = 1L;
+		Long dexcomId = 1L;
 
-		return ResponseEntity.ok().body(dexcomAuthService.refreshAccessToken(userId));
+		return ResponseEntity.ok().body(dexcomAuthService.refreshAccessToken(dexcomId));
 	}
 
 	/*
 	 * 혈당 데이터
 	 * */
-	@GetMapping("/{dexcomId}/egvs")
+	@GetMapping("/egvs")
 	public ResponseEntity<String> getEgvsFromDexcom(
-		@PathVariable Long dexcomId
 	) {
+		// 추후 수정
+		Long dexcomId = 1L;
+
 		return ResponseEntity.ok().body(glucoseService.saveEgvs(dexcomId));
 	}
 
-	@GetMapping("/{dexcomId}/egvs/period")
+	@GetMapping("/egvs/period")
 	public ResponseEntity<String> saveEgvsWithPeriod(
-		@PathVariable Long dexcomId,
 		@RequestParam String startDate,
 		@RequestParam String endDate
 	) {
+		// 추후 수정
+		Long dexcomId = 1L;
+
 		String result = glucoseService.saveEgvsWithPeriod(dexcomId, startDate, endDate);
 		return ResponseEntity.ok(result);
 	}
@@ -111,9 +115,9 @@ public class DexcomController {
 	@GetMapping("/device")
 	public ResponseEntity<String> getDeviceInfoFromDexcom() {
 		// 수정
-		Long userId = 1L;
+		Long dexcomId = 1L;
 
-		return ResponseEntity.ok().body(dexcomService.updateDeviceInfo(userId));
+		return ResponseEntity.ok().body(dexcomService.updateDeviceInfo(dexcomId));
 	}
 
 	/*
@@ -121,6 +125,7 @@ public class DexcomController {
 	 */
 	@GetMapping("/my/setting")
 	public ResponseEntity<DexcomDto> getDexcomInfo(){
+		// 수정
 		Long userId = 1L;
 
 		return dexcomService.getDexcomInfo(userId);
@@ -135,28 +140,46 @@ public class DexcomController {
 		@RequestParam Integer max) {
 		// 수정
 		Long userId = 1L;
+
 		return ResponseEntity.ok().body(dexcomService.updateMinMaxGlucose(userId, min, max));
 	}
 
 	/*
 	 * 특정 기간 혈당 데이터 리스트
 	 * */
-	@GetMapping("/my/{dexcomId}/egvs")
+	@GetMapping("/my/egvs")
 	public List<GlucoseDto> getMyGlucoseList(
-		@PathVariable Long dexcomId,
 		@RequestParam(required = false) String startDate,
 		@RequestParam(required = false) String endDate
 	) {
+		// 추후 수정
+		Long dexcomId = 1L;
+
 		return glucoseService.getMyEgvs(dexcomId, startDate, endDate);
 	}
 
 	/*
 	 * 전체 기간 혈당 데이터 리스트
 	 * */
-	@GetMapping("/my/all/{dexcomId}/egvs")
+	@GetMapping("/my/egvs/all")
 	public List<GlucoseDto> getMyAllGlucoseList(
-		@PathVariable Long dexcomId
 	) {
+		// 추후 수정
+		Long dexcomId = 1L;
+
 		return glucoseService.getMyAllEgvs(dexcomId);
+	}
+
+	/*
+	* 혈당 레벨
+	* */
+	@GetMapping("/my/egvs/level")
+	public ResponseEntity<Map<String, Long>> getGlucoseLevelCount() {
+		// 추후 수정
+		Long dexcomId = 1L;
+
+		Map<String, Long> result = glucoseService.getGlucoseLevelCounts(dexcomId);
+
+		return ResponseEntity.ok(result);
 	}
 }
