@@ -150,10 +150,10 @@ public class GlucoseService {
 		HttpEntity<Void> request = new HttpEntity<>(headers);
 
 		List<Glucose> allToSave = new ArrayList<>();
-		LocalDateTime cursor = start;
+		LocalDateTime cursor = startKCT;
 
-		while (cursor.isBefore(end)) {
-			LocalDateTime next = cursor.plusHours(12).isAfter(end) ? end : cursor.plusHours(12);
+		while (cursor.isBefore(endKCT)) {
+			LocalDateTime next = cursor.plusHours(12).isAfter(endKCT) ? endKCT : cursor.plusHours(12);
 			log.info("saveEgvsWithPeriod: 요청 기간 {} ~ {}", cursor, next);
 
 			String url = dexcomConfig.getEGV_ENDPOINT()
