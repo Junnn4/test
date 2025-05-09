@@ -118,14 +118,14 @@ public class GlucoseService {
 		}
 
 		Dexcom dexcom = auth.getDexcom();
-		// LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
-		// LocalDateTime end = LocalDateTime.parse(endDate, isoFormatter);
+		LocalDateTime startKCT = LocalDateTime.parse(startDate, isoFormatter);
+		LocalDateTime endKCT = LocalDateTime.parse(endDate, isoFormatter);
 		LocalDateTime start = TimeUtil.toUTCLocalDateTime(startDate);
 		LocalDateTime end = TimeUtil.toUTCLocalDateTime(endDate);
 		log.info("startDate :{}  ~ endDate :{}", startDate, endDate);
 		log.info("start :{}  ~ end :{}", start, end);
 
-		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeRange(dexcomId, start, end);
+		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeRange(dexcomId, startKCT, endKCT);
 		log.info("기존 저장된 recordedAt 목록 (List<LocalDateTime>): {}", existingTimes);
 		Set<String> existingTimeSet = existingTimes.stream()
 			.map(isoFormatter::format)
@@ -134,7 +134,7 @@ public class GlucoseService {
 		// List<LocalDateTime> testTimes = glucoseRepository.findRecordedAtByDexcom_DexcomId(dexcomId);
 		// log.info("기존 저장된 recordedAt111 목록 (List<LocalDateTime>): {}", testTimes);
 
-		List<Glucose> testTimes1 = glucoseRepository.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId,start,end);
+		List<Glucose> testTimes1 = glucoseRepository.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId,startKCT,endKCT);
 		List<LocalDateTime> testTimes2 = new ArrayList<>();
 		for(Glucose test : testTimes1) {
 			testTimes2.add(test.getRecordedAt());
