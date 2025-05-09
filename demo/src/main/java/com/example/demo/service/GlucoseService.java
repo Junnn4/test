@@ -21,6 +21,7 @@ import org.springframework.web.client.RestTemplate;
 import com.example.demo.common.DexcomConfig;
 import com.example.demo.common.error.GlobalErrorCodes;
 import com.example.demo.common.exception.BusinessException;
+import com.example.demo.common.util.TimeUtil;
 import com.example.demo.convert.GlucoseConverter;
 import com.example.demo.dto.GlucoseDto;
 import com.example.demo.entity.Dexcom;
@@ -117,8 +118,12 @@ public class GlucoseService {
 		}
 
 		Dexcom dexcom = auth.getDexcom();
-		LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
-		LocalDateTime end = LocalDateTime.parse(endDate, isoFormatter);
+		// LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
+		// LocalDateTime end = LocalDateTime.parse(endDate, isoFormatter);
+		LocalDateTime start = TimeUtil.toUTCLocalDateTime(startDate);
+		LocalDateTime end = TimeUtil.toUTCLocalDateTime(endDate);
+		log.info("startDate :{}  ~ endDate :{}", startDate, endDate);
+		log.info("start :{}  ~ end :{}", start, end);
 
 		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeRange(dexcomId, start, end);
 		log.info("기존 저장된 recordedAt 목록 (List<LocalDateTime>): {}", existingTimes);
@@ -162,6 +167,7 @@ public class GlucoseService {
 				log.error("saveEgvsWithPeriod: 혈당 데이터 조회 실패 ({}~{})", cursor, next, e);
 				throw new BusinessException(GlobalErrorCodes.DEXCOM203_EGV_FETCH_FAILED);
 			}
+			log.info("raw 값 조회 {}",raw);
 
 			List<Glucose> parsed;
 			try {
