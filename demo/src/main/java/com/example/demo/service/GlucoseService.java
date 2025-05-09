@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -117,14 +118,20 @@ public class GlucoseService {
 
 		Dexcom dexcom = auth.getDexcom();
 		LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
-		LocalDateTime end   = LocalDateTime.parse(endDate,   isoFormatter);
+		LocalDateTime end = LocalDateTime.parse(endDate, isoFormatter);
+
+		// 기존 데이터 시간 미리 조회
+		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeRange(dexcomId, start, end);
+		Set<String> existingTimeSet = existingTimes.stream()
+			.map(isoFormatter::format)
+			.collect(Collectors.toSet());
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(token);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		HttpEntity<Void> request = new HttpEntity<>(headers);
 
-		int saved = 0;
+		List<Glucose> allToSave = new ArrayList<>();
 		LocalDateTime cursor = start;
 
 		while (cursor.isBefore(end)) {
@@ -133,7 +140,7 @@ public class GlucoseService {
 
 			String url = dexcomConfig.getEGV_ENDPOINT()
 				+ "?startDate=" + isoFormatter.format(cursor)
-				+ "&endDate="   + isoFormatter.format(next);
+				+ "&endDate=" + isoFormatter.format(next);
 
 			String raw;
 			try {
@@ -143,28 +150,45 @@ public class GlucoseService {
 				throw new BusinessException(GlobalErrorCodes.DEXCOM203_EGV_FETCH_FAILED);
 			}
 
-			List<Glucose> list;
+			List<Glucose> parsed;
 			try {
-				list = GlucoseConverter.fromDexcomJson(dexcom, raw);
+				parsed = GlucoseConverter.fromDexcomJson(dexcom, raw);
 			} catch (Exception e) {
 				log.error("saveEgvsWithPeriod: 혈당 데이터 파싱 실패 ({}~{})", cursor, next, e);
 				throw new BusinessException(GlobalErrorCodes.DEXCOM204_JSON_PARSE_FAILED);
 			}
 
-			if (!list.isEmpty()) {
-				glucoseRepository.saveAll(list);
-				saved += list.size();
-				list.stream()
-					.map(Glucose::getRecordedAt)
-					.max(LocalDateTime::compareTo)
-					.ifPresent(dexcom::setLastEgvTime);
-			} else {
-				log.info("saveEgvsWithPeriod: 응답 데이터 없음 ({}~{})", cursor, next);
-			}
+			// 중복 제거 후 필터링
+			List<Glucose> filtered = parsed.stream()
+				.filter(g -> !existingTimeSet.contains(isoFormatter.format(g.getRecordedAt())))
+				.toList();
+
+			allToSave.addAll(filtered);
+
+			// 중복 방지용 Set 업데이트
+			filtered.stream()
+				.map(Glucose::getRecordedAt)
+				.map(isoFormatter::format)
+				.forEach(existingTimeSet::add);
+
 			cursor = next;
 		}
-		return String.format("총 %d건의 혈당 데이터를 저장했습니다. (%s ~ %s)", saved, startDate, endDate);
+
+		if (!allToSave.isEmpty()) {
+			glucoseRepository.saveAll(allToSave);
+
+			// 마지막 recordedAt으로 갱신
+			allToSave.stream()
+				.map(Glucose::getRecordedAt)
+				.max(LocalDateTime::compareTo)
+				.ifPresent(dexcom::setLastEgvTime);
+		} else {
+			log.info("saveEgvsWithPeriod: 저장할 데이터가 없습니다. ({} ~ {})", start, end);
+		}
+
+		return String.format("총 %d건의 혈당 데이터를 저장했습니다. (%s ~ %s)", allToSave.size(), startDate, endDate);
 	}
+
 
 	public List<GlucoseDto> getMyEgvs(Long dexcomId, String startDate, String endDate) {
 		log.info("getMyEgvs: dexcomId={}, startDate={}, endDate={}", dexcomId, startDate, endDate);

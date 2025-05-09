@@ -142,11 +142,13 @@ public class DexcomAuthService {
 		}
 
 		String newAccessToken = (String) resp.getBody().get("access_token");
+		String newRefreshToken = (String) resp.getBody().get("refresh_token");
+		LocalDateTime issuedAt = LocalDateTime.now();
+		LocalDateTime expiresAt = issuedAt.plusHours(2);
 
-		dexcomAuthRepository.updateAccessToken(dexcomId, newAccessToken);
+		dexcomAuthRepository.updateTokens(dexcomId, newAccessToken, newRefreshToken, issuedAt, expiresAt) ;
 
-		log.info("refreshAccessToken: access_token 갱신 완료 (dexcomId={})", dexcomId);
-		return "access_token 갱신 완료";
+		log.info("토큰 갱신 완료 (dexcomId={})", dexcomId);
+		return "토큰 갱신 완료";
 	}
 }
-
