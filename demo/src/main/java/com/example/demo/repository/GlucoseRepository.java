@@ -21,4 +21,9 @@ public interface GlucoseRepository extends JpaRepository<Glucose, Long> {
 		@Param("start") LocalDateTime start,
 		@Param("end") LocalDateTime end
 	);
+
+	// List<LocalDateTime> findRecordedAtByDexcom_DexcomId(Long dexcomId);
+
+	// @Query("SELECT g.recordedAt FROM Glucose g WHERE g.dexcom.dexcomId = :dexcomId AND g.recordedAt BETWEEN :start AND :end")
+	// List<LocalDateTime> findRecordedAtBetweenByDexcomId(Long dexcomId, LocalDateTime start, LocalDateTime end);
 }

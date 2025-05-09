@@ -120,11 +120,24 @@ public class GlucoseService {
 		LocalDateTime start = LocalDateTime.parse(startDate, isoFormatter);
 		LocalDateTime end = LocalDateTime.parse(endDate, isoFormatter);
 
-		// 기존 데이터 시간 미리 조회
 		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeRange(dexcomId, start, end);
+		log.info("기존 저장된 recordedAt 목록 (List<LocalDateTime>): {}", existingTimes);
 		Set<String> existingTimeSet = existingTimes.stream()
 			.map(isoFormatter::format)
 			.collect(Collectors.toSet());
+
+		// List<LocalDateTime> testTimes = glucoseRepository.findRecordedAtByDexcom_DexcomId(dexcomId);
+		// log.info("기존 저장된 recordedAt111 목록 (List<LocalDateTime>): {}", testTimes);
+
+		List<Glucose> testTimes1 = glucoseRepository.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId,start,end);
+		List<LocalDateTime> testTimes2 = new ArrayList<>();
+		for(Glucose test : testTimes1) {
+			testTimes2.add(test.getRecordedAt());
+		}
+		log.info("기존 저장된 recordedAt222 목록 (List<LocalDateTime>): {}", testTimes2);
+
+		// List<LocalDateTime> testTimes2 = glucoseRepository.findRecordedAtBetweenByDexcomId(dexcomId, start, end);
+
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(token);
@@ -158,10 +171,17 @@ public class GlucoseService {
 				throw new BusinessException(GlobalErrorCodes.DEXCOM204_JSON_PARSE_FAILED);
 			}
 
+			log.info("기존 저장된 recordedAt 목록 (Set<String>): {}", existingTimeSet);
+
 			// 중복 제거 후 필터링
 			List<Glucose> filtered = parsed.stream()
 				.filter(g -> !existingTimeSet.contains(isoFormatter.format(g.getRecordedAt())))
 				.toList();
+
+			List<String> filteredTimes = filtered.stream()
+				.map(g -> isoFormatter.format(g.getRecordedAt()))
+				.toList();
+			log.info("신규 저장 대상 recordedAt 목록 (filtered): {}", filteredTimes);
 
 			allToSave.addAll(filtered);
 
