@@ -125,24 +125,14 @@ public class GlucoseService {
 		log.info("startDate :{}  ~ endDate :{}", startDate, endDate);
 		log.info("start :{}  ~ end :{}", start, end);
 
+		DateTimeFormatter minuteFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+
 		List<LocalDateTime> existingTimes = glucoseRepository.findTimesByDexcomIdAndTimeRange(dexcomId, startKCT, endKCT);
-		log.info("기존 저장된 recordedAt 목록 (List<LocalDateTime>): {}", existingTimes);
 		Set<String> existingTimeSet = existingTimes.stream()
-			.map(isoFormatter::format)
+			.map(minuteFormatter::format)
 			.collect(Collectors.toSet());
 
-		// List<LocalDateTime> testTimes = glucoseRepository.findRecordedAtByDexcom_DexcomId(dexcomId);
-		// log.info("기존 저장된 recordedAt111 목록 (List<LocalDateTime>): {}", testTimes);
-
-		List<Glucose> testTimes1 = glucoseRepository.findByDexcom_DexcomIdAndRecordedAtBetween(dexcomId,startKCT,endKCT);
-		List<LocalDateTime> testTimes2 = new ArrayList<>();
-		for(Glucose test : testTimes1) {
-			testTimes2.add(test.getRecordedAt());
-		}
-		log.info("기존 저장된 recordedAt222 목록 (List<LocalDateTime>): {}", testTimes2);
-
-		// List<LocalDateTime> testTimes2 = glucoseRepository.findRecordedAtBetweenByDexcomId(dexcomId, start, end);
-
+		log.info("기존 저장된 recordedAt (분 단위): {}", existingTimeSet);
 
 		HttpHeaders headers = new HttpHeaders();
 		headers.setBearerAuth(token);
@@ -167,7 +157,6 @@ public class GlucoseService {
 				log.error("saveEgvsWithPeriod: 혈당 데이터 조회 실패 ({}~{})", cursor, next, e);
 				throw new BusinessException(GlobalErrorCodes.DEXCOM203_EGV_FETCH_FAILED);
 			}
-			log.info("raw 값 조회 {}",raw);
 
 			List<Glucose> parsed;
 			try {
@@ -177,24 +166,20 @@ public class GlucoseService {
 				throw new BusinessException(GlobalErrorCodes.DEXCOM204_JSON_PARSE_FAILED);
 			}
 
-			log.info("기존 저장된 recordedAt 목록 (Set<String>): {}", existingTimeSet);
-
-			// 중복 제거 후 필터링
 			List<Glucose> filtered = parsed.stream()
-				.filter(g -> !existingTimeSet.contains(isoFormatter.format(g.getRecordedAt())))
+				.filter(g -> !existingTimeSet.contains(minuteFormatter.format(g.getRecordedAt())))
 				.toList();
 
 			List<String> filteredTimes = filtered.stream()
-				.map(g -> isoFormatter.format(g.getRecordedAt()))
+				.map(g -> minuteFormatter.format(g.getRecordedAt()))
 				.toList();
-			log.info("신규 저장 대상 recordedAt 목록 (filtered): {}", filteredTimes);
+			log.info("신규 저장 대상 recordedAt 목록 (분 단위): {}", filteredTimes);
 
 			allToSave.addAll(filtered);
 
-			// 중복 방지용 Set 업데이트
 			filtered.stream()
 				.map(Glucose::getRecordedAt)
-				.map(isoFormatter::format)
+				.map(minuteFormatter::format)
 				.forEach(existingTimeSet::add);
 
 			cursor = next;
@@ -202,8 +187,6 @@ public class GlucoseService {
 
 		if (!allToSave.isEmpty()) {
 			glucoseRepository.saveAll(allToSave);
-
-			// 마지막 recordedAt으로 갱신
 			allToSave.stream()
 				.map(Glucose::getRecordedAt)
 				.max(LocalDateTime::compareTo)
@@ -214,6 +197,7 @@ public class GlucoseService {
 
 		return String.format("총 %d건의 혈당 데이터를 저장했습니다. (%s ~ %s)", allToSave.size(), startDate, endDate);
 	}
+
 
 
 	public List<GlucoseDto> getMyEgvs(Long dexcomId, String startDate, String endDate) {
