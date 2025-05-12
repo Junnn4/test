@@ -9,8 +9,10 @@
 <hr />
 
 <!-- ✅ 1. Dexcom 로그인 리다이렉트 -->
-<h3>1. Dexcom 로그인</h3>
-<button onclick="redirectToDexcom()">🔗 Dexcom 로그인 시작</button>
+<section>
+    <h2>1. Dexcom OAuth 로그인</h2>
+    <button id="btn-login">Dexcom 로그인</button>
+</section>
 
 <!-- ✅ 2. code → token 발급 -->
 <h3>2. code → token 교환</h3>
@@ -82,9 +84,9 @@
     const base = "http://localhost:8080/api/v1/glucose";
 
     // 1. 리다이렉트
-    function redirectToDexcom() {
-        window.location.href = `${base}/auth`;
-    }
+    document.getElementById('btn-login').addEventListener('click', () => {
+        window.location.href = '/api/v1/glucose/auth';
+    });
 
     // 2. 코드 전송
     function exchangeToken() {
