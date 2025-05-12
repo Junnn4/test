@@ -17,7 +17,6 @@ import com.example.demo.common.DexcomConfig;
 import com.example.demo.common.error.GlobalErrorCodes;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.convert.DexcomConverter;
-import com.example.demo.entity.Dexcom;
 import com.example.demo.entity.DexcomAuth;
 import com.example.demo.repository.DexcomAuthRepository;
 
@@ -31,12 +30,11 @@ import lombok.extern.slf4j.Slf4j;
 public class DexcomAuthService {
 
 	private final DexcomConfig dexcomConfig;
-	private final DexcomService dexcomService;
 	private final DexcomAuthRepository dexcomAuthRepository;
 	private final RestTemplate restTemplate = new RestTemplate();
 
 	@Transactional
-	public String exchangeCodeToToken(Map<String, String> params, Long userId) {
+	public String exchangeCodeToToken(Map<String, String> params, Long userId, Long dexcomId) {
 		String code = params.get("code");
 
 		HttpHeaders headers = new HttpHeaders();
@@ -66,7 +64,6 @@ public class DexcomAuthService {
 		String accessToken  = (String) resp.getBody().get("access_token");
 		String refreshToken = (String) resp.getBody().get("refresh_token");
 
-		// 기기 정보 조회
 		HttpHeaders deviceHeaders = new HttpHeaders();
 		deviceHeaders.setBearerAuth(accessToken);
 		HttpEntity<Void> deviceRequest = new HttpEntity<>(deviceHeaders);
@@ -90,11 +87,9 @@ public class DexcomAuthService {
 			log.error("exchangeCodeToToken: 기기 정보 조회 중 오류 발생", e);
 			throw new BusinessException(GlobalErrorCodes.DEXCOM_DEVICE_INFO_FETCH_FAILED);
 		}
-
-		// 저장 로직
-		Dexcom dexcom = dexcomService.saveDexcomSettingInfo(userId, deviceBody);
+		// dexcomService.saveDexcomSettingInfo(userId, deviceBody);
 		DexcomAuth dexcomAuth = DexcomConverter.create(
-			dexcom.getDexcomId(),
+			dexcomId,
 			accessToken,
 			refreshToken,
 			LocalDateTime.now(),
@@ -102,7 +97,7 @@ public class DexcomAuthService {
 		);
 		dexcomAuthRepository.save(dexcomAuth);
 
-		log.info("exchangeCodeToToken: 토큰 발급 및 저장 완료 (dexcomId={})", dexcom.getDexcomId());
+		log.info("exchangeCodeToToken: 토큰 발급 및 저장 완료 (dexcomId={})", dexcomId);
 		return "Successfully issued token";
 	}
 

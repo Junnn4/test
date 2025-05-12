@@ -9,6 +9,22 @@ CREATE TABLE IF NOT EXISTS `user` (
     `deleted_at`            TIMESTAMP       NULL
 );
 
+CREATE TABLE IF NOT EXISTS `cgm` (
+    `dexcom_id`			    BIGINT			NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    `user_id`			    BIGINT			NOT NULL,
+    `is_connected`		    VARCHAR(20)		NULL,
+    `max_glucose`		    INT			    NOT NULL,
+    `min_glucose`	    	INT			    NOT NULL,
+    `last_egv_time`		    TIMESTAMP		NULL,
+    `access_token`		    TEXT			NULL,
+    `refresh_token`		    TEXT        	NULL,
+    `issued_at`		        TIMESTAMP		NULL,
+    `expires_in`		    TIMESTAMP		NULL,
+    `created_at`            TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`            TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted_at`            TIMESTAMP       NULL
+);
+
 CREATE TABLE IF NOT EXISTS `dexcom` (
     `dexcom_id`			    BIGINT			NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `user_id`			    BIGINT			NOT NULL,

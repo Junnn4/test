@@ -11,19 +11,15 @@ import com.example.demo.entity.Glucose;
 
 public interface GlucoseRepository extends JpaRepository<Glucose, Long> {
 
-	List<Glucose> findByDexcom_DexcomIdAndRecordedAtBetween(Long dexcomId, LocalDateTime start, LocalDateTime end);
+	// cgm.dexcomId로 매핑
+	List<Glucose> findByCgm_DexcomIdAndRecordedAtBetween(Long dexcomId, LocalDateTime start, LocalDateTime end);
 
-	List<Glucose> findByDexcom_DexcomId(Long dexcomId);
+	List<Glucose> findByCgm_DexcomId(Long dexcomId);
 
-	@Query("SELECT g.recordedAt FROM Glucose g WHERE g.dexcom.dexcomId = :dexcomId AND g.recordedAt BETWEEN :start AND :end")
+	@Query("SELECT g.recordedAt FROM Glucose g WHERE g.cgm.dexcomId = :dexcomId AND g.recordedAt BETWEEN :start AND :end")
 	List<LocalDateTime> findTimesByDexcomIdAndTimeRange(
 		@Param("dexcomId") Long dexcomId,
 		@Param("start") LocalDateTime start,
 		@Param("end") LocalDateTime end
 	);
-
-	// List<LocalDateTime> findRecordedAtByDexcom_DexcomId(Long dexcomId);
-
-	// @Query("SELECT g.recordedAt FROM Glucose g WHERE g.dexcom.dexcomId = :dexcomId AND g.recordedAt BETWEEN :start AND :end")
-	// List<LocalDateTime> findRecordedAtBetweenByDexcomId(Long dexcomId, LocalDateTime start, LocalDateTime end);
 }

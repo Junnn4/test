@@ -9,6 +9,8 @@ import com.example.demo.common.error.GlobalErrorCodes;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.entity.DexcomAuth;
 import com.example.demo.repository.DexcomAuthRepository;
+
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -39,6 +41,7 @@ public class DexcomService {
 	private final DexcomAuthRepository dexcomAuthRepository;
 
 	private final RestTemplate restTemplate = new RestTemplate();
+	private final DexcomAuthService dexcomAuthService;
 
 	@Transactional
 	public Dexcom saveDexcomSettingInfo(Long userId, String responseBody) {
@@ -123,6 +126,18 @@ public class DexcomService {
 				log.error("refreshAccessToken: DexcomAuth 정보 없음 (dexcomId={})", dexcomId);
 				return new BusinessException(GlobalErrorCodes.DEXCOM_AUTH_NOT_FOUND);
 			});
+
+		if (auth.getExpiresIn() == null || auth.getExpiresIn().isBefore(LocalDateTime.now())) {
+			log.info("accessToken 만료됨. 갱신 시도 (dexcomId={})", dexcomId);
+			dexcomAuthService.refreshAccessToken(auth.getDexcomId());
+			auth = dexcomAuthRepository.findByDexcomId(dexcomId)
+				.orElseThrow(() -> {
+					log.error("refreshAccessToken: DexcomAuth 정보 없음 (dexcomId={})", dexcomId);
+					return new BusinessException(GlobalErrorCodes.DEXCOM_AUTH_NOT_FOUND);
+				});
+		} else {
+			log.info("accessToken 유효함 (만료 시각: {})", auth.getExpiresIn());
+		}
 
 		Dexcom dexcom = auth.getDexcom();
 		String accessToken = auth.getAccessToken();

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.example.demo.dto.GlucoseDto;
+import com.example.demo.entity.CGM;
 import com.example.demo.entity.Dexcom;
 import com.example.demo.entity.Glucose;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class GlucoseConverter {
 	private static final ObjectMapper objectMapper = new ObjectMapper();
 
-	public static List<Glucose> fromDexcomJson(Dexcom dexcom, String jsonResponse) {
+	public static List<Glucose> fromDexcomJson(CGM cgm, String jsonResponse) {
 		List<Glucose> glucoseList = new ArrayList<>();
 
 		try {
@@ -28,7 +29,7 @@ public class GlucoseConverter {
 						.toLocalDateTime();
 
 					glucoseList.add(new Glucose(
-						dexcom,
+						cgm,
 						record.get("value").asInt(),
 						record.get("transmitterGeneration").asText(),
 						record.get("trend").asText(),

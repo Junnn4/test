@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>CGM API 전체 테스트</title>
+</head>
+<body>
+<h1>📡 CGM + Glucose API 전체 테스트</h1>
+<hr />
+
+<!-- ✅ 1. Dexcom 로그인 리다이렉트 -->
+<h3>1. Dexcom 로그인</h3>
+<button onclick="redirectToDexcom()">🔗 Dexcom 로그인 시작</button>
+
+<!-- ✅ 2. code → token 발급 -->
+<h3>2. code → token 교환</h3>
+<input type="text" id="code" placeholder="redirect된 URL의 code 값" />
+<button onclick="exchangeToken()">📩 코드 전송 (userId=1)</button>
+<pre id="result1"></pre>
+
+<!-- ✅ 3. 토큰 리프레시 -->
+<h3>3. Refresh Token</h3>
+<button onclick="refreshToken()">♻️ 토큰 갱신 (dexcomId=1)</button>
+<pre id="result2"></pre>
+
+<!-- ✅ 4. 기기 정보 갱신 -->
+<h3>4. 기기 연결 상태 업데이트</h3>
+<button onclick="updateDevice()">📶 기기 업데이트 (dexcomId=1)</button>
+<pre id="result3"></pre>
+
+<!-- ✅ 5. CGM 정보 조회 -->
+<h3>5. CGM 정보 조회</h3>
+<button onclick="getInfo()">📋 CGM 설정 정보 (userId=1)</button>
+<pre id="result4"></pre>
+
+<!-- ✅ 6. 혈당 범위 업데이트 -->
+<h3>6. 혈당 범위 설정</h3>
+<input type="number" id="min" placeholder="min (예: 70)" />
+<input type="number" id="max" placeholder="max (예: 180)" />
+<button onclick="updateRange()">🎚️ 업데이트</button>
+<pre id="result5"></pre>
+
+<!-- ✅ 7. 최근 혈당 저장 -->
+<h3>7. 최근 혈당 데이터 저장</h3>
+<button onclick="saveEgvs()">📥 저장 (dexcomId=1)</button>
+<pre id="result6"></pre>
+
+<!-- ✅ 8. 기간별 혈당 저장 -->
+<h3>8. 기간별 혈당 저장</h3>
+<section>
+    <h2>8. 기간 지정 EGVS 저장</h2>
+    <label>
+        Start Date (ISO):
+        <input id="inputPeriodStart" placeholder="2025-05-01T00:00:00" />
+    </label>
+    <label>
+        End Date (ISO):
+        <input id="inputPeriodEnd" placeholder="2025-05-01T02:00:00" />
+    </label>
+    <button id="btn-save-egvs-period">기간 EGVS 저장</button>
+    <pre id="periodEgvsOutput">(저장 결과 메시지)</pre>
+</section>
+
+<!-- ✅ 9. 기간별 혈당 조회 -->
+<h3>9. 기간별 혈당 조회</h3>
+<input type="datetime-local" id="startQuery" />
+<input type="datetime-local" id="endQuery" />
+<button onclick="getEgvs()">📊 조회</button>
+<pre id="result8"></pre>
+
+<!-- ✅ 10. 전체 혈당 조회 -->
+<h3>10. 전체 혈당 조회</h3>
+<button onclick="getAllEgvs()">🧾 전체 조회 (dexcomId=1)</button>
+<pre id="result9"></pre>
+
+<!-- ✅ 11. 혈당 통계 -->
+<h3>11. 혈당 통계</h3>
+<button onclick="getLevelCounts()">📈 통계 (dexcomId=1)</button>
+<pre id="result10"></pre>
+
+<script>
+    const base = "http://localhost:8080/api/v1/glucose";
+
+    // 1. 리다이렉트
+    function redirectToDexcom() {
+        window.location.href = `${base}/auth`;
+    }
+
+    // 2. 코드 전송
+    function exchangeToken() {
+        const code = document.getElementById("code").value;
+        fetch(`${base}/code`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code })
+        })
+            .then(res => res.text())
+            .then(txt => document.getElementById("result1").innerText = txt);
+    }
+
+    // 3. 토큰 리프레시
+    function refreshToken() {
+        fetch(`${base}/token/refresh?dexcomId=1`, { method: "POST" })
+            .then(res => res.text())
+            .then(txt => document.getElementById("result2").innerText = txt);
+    }
+
+    // 4. 기기 연결 상태
+    function updateDevice() {
+        fetch(`${base}/device?dexcomId=1`, { method: "PUT" })
+            .then(res => res.text())
+            .then(txt => document.getElementById("result3").innerText = txt);
+    }
+
+    // 5. CGM 설정 정보
+    function getInfo() {
+        fetch(`${base}/info?userId=1`)
+            .then(res => res.json())
+            .then(json => document.getElementById("result4").innerText = JSON.stringify(json, null, 2));
+    }
+
+    // 6. 범위 업데이트
+    function updateRange() {
+        const min = document.getElementById("min").value;
+        const max = document.getElementById("max").value;
+        fetch(`${base}/range?userId=1&min=${min}&max=${max}`, { method: "PATCH" })
+            .then(res => res.text())
+            .then(txt => document.getElementById("result5").innerText = txt);
+    }
+
+    // 7. 최근 혈당 저장
+    function saveEgvs() {
+        fetch(`${base}/glucose?dexcomId=1`, { method: "POST" })
+            .then(res => res.text())
+            .then(txt => document.getElementById("result6").innerText = txt);
+    }
+
+    // 8. 기간별 혈당 저장
+    document.getElementById('btn-save-egvs-period').addEventListener('click', async () => {
+        const start = encodeURIComponent(document.getElementById('inputPeriodStart').value);
+        const end   = encodeURIComponent(document.getElementById('inputPeriodEnd').value);
+        const res   = await fetch(`${base}/period?dexcomId=1&startDate=${start}&endDate=${end}`, { method: 'POST' });
+        document.getElementById('periodEgvsOutput').textContent = await res.text();
+    });
+
+    // 9. 기간별 혈당 조회
+    function getEgvs() {
+        const start = document.getElementById("startQuery").value;
+        const end = document.getElementById("endQuery").value;
+        fetch(`${base}/my?dexcomId=1&startDate=${start}&endDate=${end}`)
+            .then(res => res.json())
+            .then(json => document.getElementById("result8").innerText = JSON.stringify(json, null, 2));
+    }
+
+    // 10. 전체 혈당 조회
+    function getAllEgvs() {
+        fetch(`${base}/all?dexcomId=1`)
+            .then(res => res.json())
+            .then(json => document.getElementById("result9").innerText = JSON.stringify(json, null, 2));
+    }
+
+    // 11. 혈당 통계
+    function getLevelCounts() {
+        fetch(`${base}/level?dexcomId=1`)
+            .then(res => res.json())
+            .then(json => document.getElementById("result10").innerText = JSON.stringify(json, null, 2));
+    }
+
+    // 페이지 로드시 code 자동 채우기
+    window.onload = () => {
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+        if (code) {
+            document.getElementById("code").value = code;
+        }
+    };
+</script>
+</body>
+</html>
