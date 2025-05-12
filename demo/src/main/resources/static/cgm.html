@@ -81,11 +81,11 @@
 <pre id="result10"></pre>
 
 <script>
-    const base = "http://localhost:8080/api/v1/glucose";
-
+    // const base = "http://localhost:8080/api/v1/glucose";
+    const base = "https://dangyo.store/api/v1/glucose";
     // 1. 리다이렉트
     document.getElementById('btn-login').addEventListener('click', () => {
-        window.location.href = '/api/v1/glucose/auth';
+        window.location.href = '/auth';
     });
 
     // 2. 코드 전송
