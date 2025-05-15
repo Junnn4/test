@@ -2,48 +2,41 @@ package com.example.report.controller;
 
 import java.time.LocalDateTime;
 
-import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.report.dto.ReportDto;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
-@RestController("/api/v1/report")
+@Slf4j
+@RequiredArgsConstructor
+@RestController
+@RequestMapping("/api/v1/report")
+@CrossOrigin(origins = "*")
 public class ReportController {
 
 	/*
-	* 특정 날짜 리포트 조회
-	* */
-	@GetMapping("/my")
-	public ResponseEntity<ReportDto> getReport(
-		@RequestParam LocalDateTime date) {
+	 * 실시간 혈당그래프 조회
+	 * */
 
-
-
-		return ResponseEntity.ok().body(new ReportDto());
-	}
 
 	/*
-	* meal에 있는 식사 정보 조회
-	* */
-	@GetMapping("/food")
-	public ResponseEntity<String> getFoodInfo(){
+	 * 혈당스파이크 정보 조회
+	 * */
 
 
-		return ResponseEntity.ok().body("");
+	/*
+	 * 식사 시간의 20분 전, 2시간 후 혈당 조회
+	 * */
+	@GetMapping("/glucose")
+	public String getUserGlucose(
+		@RequestParam LocalDateTime date,
+		@RequestHeader("userId") int userId){
+
+		return "";
 	}
-
-	@PostMapping("/nutrition")
-	public void setMyNutrition(
-		@RequestBody ){
-
-	}
-
-
-
-
-
 }
